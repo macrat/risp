@@ -1,21 +1,33 @@
 use std::fmt;
 use std::convert::From;
 use std::collections::VecDeque;
-use std::ptr;
 
 #[derive(Debug)]
-struct Cons(Box<RType>, Box<RType>);
+enum RTypeError {
+    IsNotList
+}
 
 #[derive(Debug)]
 enum RType {
     Symbol(String),
     Int(i64),
     // TODO: implement function here
-    Cons(Cons),
+    Cons(Box<RType>, Box<RType>),
     Nil,
 }
 
 impl RType {
+    fn pair(car: RType, cdr: RType) -> RType {
+        RType::Cons(
+            Box::new(car),
+            Box::new(cdr),
+        )
+    }
+
+    fn single(car: RType) -> RType {
+        RType::pair(car, RType::Nil)
+    }
+
     fn parse(s: String) -> RType {
         if let Ok(i) = s.parse::<i64>() {
             RType::Int(i)
@@ -28,24 +40,24 @@ impl RType {
         match self {
             RType::Symbol(name) => Box::new(RType::Symbol(String::from(name))),
             RType::Int(value) => Box::new(RType::Int(*value)),
-            RType::Cons(Cons(car, cdr)) => Box::new(RType::Cons(Cons(car.compute(), cdr.compute()))), // TODO: call function here
+            RType::Cons(car, cdr) => Box::new(RType::Cons(car.compute(), cdr.compute())), // TODO: call function here
             RType::Nil => Box::new(RType::Nil),
         }
     }
 
-    fn is_nil(&self) -> bool {
-        if let RType::Nil = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    fn is_list(&self) -> bool {
-        match self {
-            RType::Nil => true,
-            RType::Cons(Cons(_, cdr)) => (*cdr).is_list(),
-            _ => false,
+    fn push(&mut self, val: RType) -> Result<(), RTypeError> {
+        let mut cur = self;
+        loop {
+            match cur {
+                RType::Nil => {
+                    *cur = RType::single(val);
+                    return Ok(());
+                },
+                RType::Cons(_, cdr) => {
+                    cur = cdr;
+                },
+                _ => return Err(RTypeError::IsNotList)
+            }
         }
     }
 }
@@ -55,20 +67,24 @@ impl fmt::Display for RType {
         match self {
             RType::Symbol(name) => write!(f, "{}", name),
             RType::Int(value) => write!(f, "{}", value),
-            RType::Cons(cons) => {
-                if self.is_list() {
-                    let mut c = self;
-                    let mut vec: Vec<String> = Vec::new();
-                    while !(*c).is_nil() {
-                        if let RType::Cons(cons) = &*c {
-                            vec.push(format!("{}", cons.0));
-                            c = &*cons.1;
-                        }
+            RType::Cons(_, _) => {
+                let mut cur = self;
+                let mut vec: Vec<String> = Vec::new();
+                loop {
+                    match cur {
+                        RType::Nil => break,
+                        RType::Cons(car, cdr) => {
+                            vec.push(format!("{}", car));
+                            cur = cdr;
+                        },
+                        x => {
+                            vec.push(".".to_string());
+                            vec.push(format!("{}", x));
+                            break;
+                        },
                     }
-                    write!(f, "({})", vec.join(" "))
-                } else {
-                    write!(f, "(cons {} {})", cons.0, cons.1)
                 }
+                write!(f, "({})", vec.join(" "))
             },
             RType::Nil => write!(f, "()"),
         }
@@ -143,44 +159,9 @@ impl Iterator for TokenIterator<'_> {
     }
 }
 
-struct ListBuilder {
-    head: RType,
-    tail: *mut RType,
-}
-
-impl ListBuilder {
-    fn new() -> ListBuilder {
-        ListBuilder{
-            head: RType::Nil,
-            tail: ptr::null_mut(),
-        }
-    }
-
-    fn push(&mut self, val: Box<RType>) {
-        if !self.tail.is_null() {
-            unsafe {
-                if let RType::Cons(cons) = &mut *self.tail {
-                    cons.1 = Box::new(RType::Cons(Cons(val, Box::new(RType::Nil))));
-                    self.tail = &mut *cons.1;
-                    return
-                }
-            }
-        }
-
-        self.head = RType::Cons(Cons(val, Box::new(RType::Nil)));
-        self.tail = &mut self.head;
-    }
-}
-
-impl fmt::Display for ListBuilder {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.head.fmt(f)
-    }
-}
-
 struct ValueIterator<'a> {
     tokens: &'a mut dyn Iterator<Item=Token>,
-    stack: Vec<ListBuilder>,
+    stack: Vec<RType>,
 }
 
 impl ValueIterator<'_> {
@@ -199,32 +180,24 @@ impl Iterator for ValueIterator<'_> {
         loop {
             match self.tokens.next() {
                 Some(Token::OpenList) => {
-                    let list = ListBuilder::new();
-                    println!("add stack: {}", list.head);
+                    let list = RType::Nil;
                     self.stack.push(list);
                 },
                 Some(Token::CloseList) => {
                     if let Some(value) = self.stack.pop() {
-                        println!("close stack: {}", value.head);
                         if let Some(mut last) = self.stack.pop() {
-                            print!("stack again: {} -> {}", value, last);
-                            last.push(Box::new(value.head));
-                            println!(" => {}", last);
+                            last.push(value);
                             self.stack.push(last);
                         } else {
-                            println!("return stack: {}", value.head);
-                            return Some(value.head);
+                            return Some(value);
                         }
                     }
                 }
                 Some(Token::Value(value)) => {
                     if let Some(mut last) = self.stack.pop() {
-                        print!("push item: {}", value);
-                        last.push(Box::new(value));
-                        println!(" => {}", last);
+                        last.push(value);
                         self.stack.push(last);
                     } else {
-                        println!("bare item: {}", value);
                         return Some(value);
                     }
                 },
@@ -235,24 +208,9 @@ impl Iterator for ValueIterator<'_> {
 }
 
 fn main() {
-    let input = "(a b c)\n(a (b) c)\n((a) b c)\n(a b (c))".to_string();
+    let input = "(println\n (+ 1 2))".to_string();
     println!("{}\n", input);
     for x in ValueIterator::new(&mut TokenIterator::new(&mut input.chars())) {
-        println!("{}\n", x);
+        println!("{}", x);
     }
-
-    /*
-    println!("-----");
-
-    let mut a = ListBuilder::new();
-    a.push(RType::Symbol("println".to_string()));
-    {
-        let mut b = ListBuilder::new();
-        b.push(RType::Symbol("+".to_string()));
-        b.push(RType::Int(42));
-        b.push(RType::Int(123));
-        a.push(b.head);
-    }
-    println!("{}", a.head);
-    */
 }
