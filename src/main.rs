@@ -1,6 +1,8 @@
-use std::collections::VecDeque;
+use std::cell::RefCell;
+use std::collections::{HashMap, VecDeque};
 use std::convert::From;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug)]
 enum RTypeError {
@@ -11,6 +13,7 @@ enum RTypeError {
 enum RType {
     Symbol(String),
     Int(i64),
+    String(String),
     // TODO: implement function here
     Cons(Box<RType>, Box<RType>),
     Nil,
@@ -26,6 +29,8 @@ impl RType {
     }
 
     fn parse(s: String) -> Box<RType> {
+        // TODO: make way to parse string
+
         Box::new(if let Ok(i) = s.parse::<i64>() {
             RType::Int(i)
         } else {
@@ -33,12 +38,16 @@ impl RType {
         })
     }
 
-    fn compute(&self) -> Box<RType> {
+    fn compute(&self, scope: Rc<RefCell<Scope>>) -> Box<RType> {
         Box::new(match self {
-            RType::Symbol(name) => RType::Symbol(name.to_string()), // TODO: fetch actual value here
+            RType::Symbol(name) => match scope.borrow().get(name) {
+                Some(val) => *val.compute(Rc::clone(&scope)),
+                None => RType::Nil,
+            },
             RType::Int(i) => RType::Int(*i),
+            RType::String(s) => RType::String(s.clone()),
             RType::Cons(car, cdr) => {
-                RType::Cons((*car).compute(), (*cdr).compute())
+                RType::Cons((*car).compute(Rc::clone(&scope)), (*cdr).compute(scope))
             } // TODO: call function here
             RType::Nil => RType::Nil,
         })
@@ -66,6 +75,7 @@ impl fmt::Display for RType {
         match self {
             RType::Symbol(name) => write!(f, "{}", name),
             RType::Int(value) => write!(f, "{}", value),
+            RType::String(value) => write!(f, "{}", value),
             RType::Cons(_, _) => {
                 let mut cur = self;
                 let mut vec: Vec<String> = Vec::new();
@@ -207,10 +217,95 @@ impl Iterator for ValueIterator<'_> {
     }
 }
 
+#[derive(Debug)]
+enum NamespaceError {
+    AlreadyExist,
+}
+
+#[derive(Debug)]
+struct Scope {
+    parent: Option<Rc<RefCell<Scope>>>,
+    values: HashMap<String, Rc<RType>>, // XXX: I really don't like this Rc.
+}
+
+impl Scope {
+    fn new(parent: Option<Rc<RefCell<Scope>>>) -> Rc<RefCell<Scope>> {
+        Rc::new(RefCell::new(Scope {
+            parent,
+            values: HashMap::new(),
+        }))
+    }
+
+    fn is_exist(&self, name: &String) -> bool {
+        if self.values.contains_key(name) {
+            true
+        } else if let Some(parent) = &self.parent {
+            (*parent).borrow().is_exist(name)
+        } else {
+            false
+        }
+    }
+
+    fn define(&mut self, name: String, value: Rc<RType>) -> Result<(), NamespaceError> {
+        if self.is_exist(&name) {
+            return Err(NamespaceError::AlreadyExist);
+        }
+
+        self.values.insert(name, value);
+        Ok(())
+    }
+
+    fn get(&self, name: &String) -> Option<Rc<RType>> {
+        let result = self.values.get(name);
+        if let Some(x) = result {
+            Some(Rc::clone(x))
+        } else if let Some(parent) = &self.parent {
+            (*parent).borrow().get(name)
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for Scope {
+    fn drop(&mut self) {
+        let keys: Vec<String> = self.values.keys().map(|x| x.to_string()).collect();
+        for key in keys {
+            println!("DEBUG drop {}", key);
+            self.values.remove(&key);
+        }
+    }
+}
+
 fn main() {
-    let input = "(println\n (+ 1 2))".to_string();
-    println!("{}\n", input);
+    let parent = Scope::new(None);
+    let child = Scope::new(Some(Rc::clone(&parent)));
+    (*parent).borrow_mut().define(
+        String::from("hello"),
+        Rc::new(RType::String(String::from("world"))),
+    );
+    (*child)
+        .borrow_mut()
+        .define(String::from("abc"), Rc::new(RType::Int(123)));
+    println!(
+        "child.hello = {:?}",
+        child.borrow().get(&String::from("hello"))
+    );
+    println!("child.abc = {:?}", child.borrow().get(&String::from("abc")));
+    println!(
+        "parent.hello = {:?}",
+        parent.borrow().get(&String::from("hello"))
+    );
+    println!(
+        "parent.abc = {:?}",
+        parent.borrow().get(&String::from("abc"))
+    );
+
+    println!();
+
+    let input = "(hello abc)".to_string();
+    println!("{}", input);
     for x in ValueIterator::new(&mut TokenIterator::new(&mut input.chars())) {
-        println!("{}", x);
+        println!("{}", x.compute(Rc::clone(&child)));
     }
 }
