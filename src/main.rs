@@ -1,10 +1,12 @@
-use std::fmt;
-use std::convert::From;
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::convert::From;
+use std::fmt;
+use std::mem;
 
 #[derive(Debug)]
 enum RTypeError {
-    IsNotList
+    IsNotList,
 }
 
 #[derive(Debug)]
@@ -12,51 +14,50 @@ enum RType {
     Symbol(String),
     Int(i64),
     // TODO: implement function here
-    Cons(Box<RType>, Box<RType>),
+    Cons(RefCell<Box<RType>>, RefCell<Box<RType>>),
     Nil,
 }
 
 impl RType {
-    fn pair(car: RType, cdr: RType) -> RType {
-        RType::Cons(
-            Box::new(car),
-            Box::new(cdr),
-        )
+    fn pair(car: RefCell<Box<RType>>, cdr: RefCell<Box<RType>>) -> RefCell<Box<RType>> {
+        RefCell::new(Box::new(RType::Cons(car, cdr)))
     }
 
-    fn single(car: RType) -> RType {
-        RType::pair(car, RType::Nil)
+    fn single(car: RefCell<Box<RType>>) -> RefCell<Box<RType>> {
+        RType::pair(car, RefCell::new(Box::new(RType::Nil)))
     }
 
-    fn parse(s: String) -> RType {
-        if let Ok(i) = s.parse::<i64>() {
+    fn parse(s: String) -> RefCell<Box<RType>> {
+        RefCell::new(Box::new(if let Ok(i) = s.parse::<i64>() {
             RType::Int(i)
         } else {
             RType::Symbol(s)
-        }
+        }))
     }
 
-    fn compute(&self) -> Box<RType> {
-        match self {
-            RType::Symbol(name) => Box::new(RType::Symbol(String::from(name))),
-            RType::Int(value) => Box::new(RType::Int(*value)),
-            RType::Cons(car, cdr) => Box::new(RType::Cons(car.compute(), cdr.compute())), // TODO: call function here
-            RType::Nil => Box::new(RType::Nil),
-        }
+    fn compute(&self) -> RefCell<Box<RType>> {
+        RefCell::new(Box::new(match self {
+            RType::Symbol(name) => RType::Symbol(name.to_string()), // TODO: fetch actual value here
+            RType::Int(i) => RType::Int(*i),
+            RType::Cons(car, cdr) => {
+                RType::Cons((*car).borrow_mut().compute(), (*cdr).borrow_mut().compute())
+            } // TODO: call function here
+            RType::Nil => RType::Nil,
+        }))
     }
 
-    fn push(&mut self, val: RType) -> Result<(), RTypeError> {
+    fn push(&mut self, val: RefCell<Box<RType>>) -> Result<(), RTypeError> {
         let mut cur = self;
         loop {
             match cur {
                 RType::Nil => {
-                    *cur = RType::single(val);
+                    mem::swap(cur, &mut **RType::single(val).borrow_mut());
                     return Ok(());
-                },
+                }
                 RType::Cons(_, cdr) => {
-                    cur = cdr;
-                },
-                _ => return Err(RTypeError::IsNotList)
+                    cur = &mut **cdr.borrow_mut();
+                }
+                _ => return Err(RTypeError::IsNotList),
             }
         }
     }
@@ -74,18 +75,18 @@ impl fmt::Display for RType {
                     match cur {
                         RType::Nil => break,
                         RType::Cons(car, cdr) => {
-                            vec.push(format!("{}", car));
-                            cur = cdr;
-                        },
+                            vec.push(format!("{}", *car.borrow()));
+                            cur = &mut **cdr.borrow();
+                        }
                         x => {
                             vec.push(".".to_string());
                             vec.push(format!("{}", x));
                             break;
-                        },
+                        }
                     }
                 }
                 write!(f, "({})", vec.join(" "))
-            },
+            }
             RType::Nil => write!(f, "()"),
         }
     }
@@ -101,18 +102,18 @@ impl From<i64> for RType {
 enum Token {
     OpenList,
     CloseList,
-    Value(RType),
+    Value(RefCell<Box<RType>>),
 }
 
 struct TokenIterator<'a> {
-    chars: &'a mut dyn Iterator<Item=char>,
+    chars: &'a mut dyn Iterator<Item = char>,
     tokens: VecDeque<Token>,
     buf: String,
 }
 
 impl TokenIterator<'_> {
-    fn new(chars: &mut dyn Iterator<Item=char>) -> TokenIterator {
-        TokenIterator{
+    fn new(chars: &mut dyn Iterator<Item = char>) -> TokenIterator {
+        TokenIterator {
             chars,
             tokens: VecDeque::new(),
             buf: String::new(),
@@ -121,7 +122,8 @@ impl TokenIterator<'_> {
 
     fn flush(&mut self) {
         if self.buf.len() > 0 {
-            self.tokens.push_front(Token::Value(RType::parse(self.buf.to_string())));
+            self.tokens
+                .push_front(Token::Value(RType::parse(self.buf.to_string())));
             self.buf = String::new()
         }
     }
@@ -131,11 +133,11 @@ impl TokenIterator<'_> {
             '(' => {
                 self.flush();
                 self.tokens.push_front(Token::OpenList);
-            },
+            }
             ')' => {
                 self.flush();
                 self.tokens.push_front(Token::CloseList);
-            },
+            }
             ' ' | '\t' | '\r' | '\n' => self.flush(),
             _ => self.buf.push(c),
         }
@@ -151,8 +153,8 @@ impl Iterator for TokenIterator<'_> {
                 Some(c) => self.push(c),
                 None => {
                     self.flush();
-                    return self.tokens.pop_back()
-                },
+                    return self.tokens.pop_back();
+                }
             }
         }
         self.tokens.pop_back()
@@ -160,13 +162,13 @@ impl Iterator for TokenIterator<'_> {
 }
 
 struct ValueIterator<'a> {
-    tokens: &'a mut dyn Iterator<Item=Token>,
-    stack: Vec<RType>,
+    tokens: &'a mut dyn Iterator<Item = Token>,
+    stack: Vec<RefCell<Box<RType>>>,
 }
 
 impl ValueIterator<'_> {
-    fn new(tokens: &mut dyn Iterator<Item=Token>) -> ValueIterator {
-        ValueIterator{
+    fn new(tokens: &mut dyn Iterator<Item = Token>) -> ValueIterator {
+        ValueIterator {
             tokens,
             stack: Vec::new(),
         }
@@ -174,19 +176,19 @@ impl ValueIterator<'_> {
 }
 
 impl Iterator for ValueIterator<'_> {
-    type Item = RType;
+    type Item = RefCell<Box<RType>>;
 
-    fn next(&mut self) -> Option<RType> {
+    fn next(&mut self) -> Option<RefCell<Box<RType>>> {
         loop {
             match self.tokens.next() {
                 Some(Token::OpenList) => {
-                    let list = RType::Nil;
+                    let list = RefCell::new(Box::new(RType::Nil));
                     self.stack.push(list);
-                },
+                }
                 Some(Token::CloseList) => {
                     if let Some(value) = self.stack.pop() {
-                        if let Some(mut last) = self.stack.pop() {
-                            last.push(value);
+                        if let Some(last) = self.stack.pop() {
+                            last.borrow_mut().push(value);
                             self.stack.push(last);
                         } else {
                             return Some(value);
@@ -194,13 +196,13 @@ impl Iterator for ValueIterator<'_> {
                     }
                 }
                 Some(Token::Value(value)) => {
-                    if let Some(mut last) = self.stack.pop() {
-                        last.push(value);
+                    if let Some(last) = self.stack.pop() {
+                        last.borrow_mut().push(value);
                         self.stack.push(last);
                     } else {
                         return Some(value);
                     }
-                },
+                }
                 None => return None,
             }
         }
@@ -211,6 +213,6 @@ fn main() {
     let input = "(println\n (+ 1 2))".to_string();
     println!("{}\n", input);
     for x in ValueIterator::new(&mut TokenIterator::new(&mut input.chars())) {
-        println!("{}", x);
+        println!("{}", x.borrow());
     }
 }
