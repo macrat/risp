@@ -7,7 +7,7 @@ use super::types::{RError, RType};
 
 #[derive(Debug)]
 pub struct Scope {
-    parent: Option<Rc<RefCell<Scope>>>,
+    pub parent: Option<Rc<RefCell<Scope>>>,
     values: HashMap<String, Rc<RType>>,
 }
 

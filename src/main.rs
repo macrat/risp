@@ -131,10 +131,17 @@ fn main() {
 
     let input = r"
         (def double (func (x) (* x 2)))
+
         (def doubled (double 4))
         (println doubled)
+
         (set doubled (double doubled))
         (println doubled)
+
+        (def countdown (func (x)
+          (println x)
+          (if x (countdown (- x 1)))))
+        (countdown 5)
     "
     .to_string();
     for x in ValueIterator::new(&mut TokenIterator::new(&mut input.chars())) {

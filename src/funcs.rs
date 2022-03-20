@@ -128,6 +128,37 @@ impl Callable for Println {
 }
 
 #[derive(Debug)]
+struct If;
+
+impl Callable for If {
+    fn name(&self) -> &str {
+        "if"
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        if args.len() != 2 && args.len() != 3 {
+            return Err(RError::Argument(format!(
+                "`if` requires 2 or 3 arguments but got {} arguments.",
+                args.len()
+            )));
+        }
+
+        let cond = match args[0].compute(Rc::clone(&scope)) {
+            Ok(val) => val.into(),
+            Err(err) => return Err(err),
+        };
+
+        if cond {
+            args[1].compute(Scope::new(Some(scope)))
+        } else if args.len() == 3 {
+            args[2].compute(Scope::new(Some(scope)))
+        } else {
+            Ok(RType::nil())
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Operator<'a>(&'a str, fn(Vec<RType>) -> Result<RType, RError>);
 
 impl Callable for Operator<'_> {
@@ -166,6 +197,56 @@ pub fn register_to(scope: &mut Scope) -> Result<(), RError> {
     register!(scope, "def", binary_func!(Def));
     register!(scope, "set", binary_func!(Set));
     register!(scope, "println", binary_func!(Println));
+    register!(scope, "if", binary_func!(If));
+
+    register!(
+        scope,
+        "+",
+        binary_func!(Operator("+", |xs| {
+            let mut result = 0;
+            for x in xs {
+                if let RType::Atom(RAtom::Int(x)) = x {
+                    result += x;
+                } else {
+                    return Err(RError::Type(format!("`+` can not apply to `{}`", x)));
+                }
+            }
+            Ok(RType::Atom(RAtom::Int(result)))
+        }))
+    );
+
+    register!(
+        scope,
+        "-",
+        binary_func!(Operator("-", |xs| {
+            match xs.len() {
+                0 => Ok(RType::Atom(RAtom::Int(0))),
+                1 => {
+                    if let RType::Atom(RAtom::Int(x)) = xs[0] {
+                        Ok(RType::Atom(RAtom::Int(-x)))
+                    } else {
+                        Err(RError::Type(format!("`-` can not apply to `{}`", xs[0])))
+                    }
+                }
+                _ => {
+                    let mut result = if let RType::Atom(RAtom::Int(x)) = xs[0] {
+                        x
+                    } else {
+                        return Err(RError::Type(format!("`-` can not apply to `{}`", xs[0])));
+                    };
+
+                    for x in &xs[1..] {
+                        if let RType::Atom(RAtom::Int(x)) = x {
+                            result -= *x;
+                        } else {
+                            return Err(RError::Type(format!("`-` can not apply to `{}`", x)));
+                        }
+                    }
+                    Ok(RType::Atom(RAtom::Int(result)))
+                }
+            }
+        }))
+    );
 
     register!(
         scope,

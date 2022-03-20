@@ -64,6 +64,16 @@ impl fmt::Display for RAtom {
     }
 }
 
+impl From<RAtom> for bool {
+    fn from(item: RAtom) -> bool {
+        match item {
+            RAtom::Symbol(_) => true,
+            RAtom::Int(i) => i != 0,
+            RAtom::String(s) => s.len() != 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RList(Vec<RType>);
 
@@ -85,6 +95,10 @@ impl RList {
     }
 
     pub fn compute(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        if self.0.len() == 0 {
+            return Ok(RType::nil());
+        }
+
         match self.0[0].compute(Rc::clone(&scope)) {
             Ok(first) => match &first {
                 RType::Func(func) => func.call(RList(self.0[1..].to_vec()), scope),
@@ -113,6 +127,10 @@ impl RList {
         vec.join(" ")
     }
 
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<RType> {
         self.0.iter()
     }
@@ -131,6 +149,12 @@ impl Clone for RList {
             result.push((*x).clone());
         }
         result
+    }
+}
+
+impl From<RList> for bool {
+    fn from(item: RList) -> bool {
+        item.len() != 0
     }
 }
 
@@ -188,7 +212,7 @@ impl Callable for RFunc {
                 args: arg_names,
                 body,
             } => {
-                let scope = Scope::new(Some(scope));
+                let local = Scope::new(Some(Rc::clone(&scope)));
                 if args.0.len() != arg_names.len() {
                     return Err(RError::Argument(format!(
                         "this function needs {} arguments but got {} arguments.",
@@ -198,15 +222,20 @@ impl Callable for RFunc {
                 }
 
                 for (name, value) in arg_names.iter().zip(args.0) {
-                    if let Err(err) = (*scope)
-                        .borrow_mut()
-                        .define(String::from(name), Rc::new(value))
-                    {
-                        return Err(err);
+                    match value.compute(Rc::clone(&scope)) {
+                        Ok(value) => {
+                            if let Err(err) = (*local)
+                                .borrow_mut()
+                                .define(String::from(name), Rc::new(value))
+                            {
+                                return Err(err);
+                            }
+                        }
+                        Err(err) => return Err(err),
                     }
                 }
 
-                match body.compute_each(scope) {
+                match body.compute_each(local) {
                     Ok(RList(result)) => {
                         if let Some(x) = result.last() {
                             Ok(x.clone())
@@ -281,6 +310,16 @@ impl Clone for RType {
             RType::Atom(atom) => RType::Atom(atom.clone()),
             RType::List(list) => RType::List(list.clone()),
             RType::Func(func) => RType::Func(Rc::clone(func)),
+        }
+    }
+}
+
+impl From<RType> for bool {
+    fn from(item: RType) -> bool {
+        match item {
+            RType::Atom(atom) => atom.into(),
+            RType::List(list) => list.into(),
+            RType::Func(_) => true,
         }
     }
 }
