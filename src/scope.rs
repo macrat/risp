@@ -21,10 +21,7 @@ impl Scope {
 
     pub fn define(&mut self, name: String, value: Rc<RType>) -> Result<(), RError> {
         if self.values.contains_key(&name) {
-            Err(RError::AlreadyExist(format!(
-                "`{}` is already exist in this scope",
-                name
-            )))
+            Err(RError::AlreadyExist(name))
         } else {
             self.values.insert(name, value);
             Ok(())
@@ -35,11 +32,10 @@ impl Scope {
         if self.values.contains_key(&name) {
             self.values.insert(name, value);
             Ok(())
+        } else if let Some(parent) = &self.parent {
+            (*parent).borrow_mut().set(name, value)
         } else {
-            Err(RError::NotExist(format!(
-                "`{}` is not exist in this scope",
-                name
-            )))
+            Err(RError::NotExist(name))
         }
     }
 

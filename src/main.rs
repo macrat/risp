@@ -13,18 +13,15 @@ fn main() {
     }
 
     let input = r"
-        (def double (func (x) (* x 2)))
+        (def f (func (x)
+          ((def loop (func (n)
+            (set x (* x n))
+            (if (= n 1)
+              x
+              (loop (- n 1)))))
+            (- x 1))))
 
-        (def doubled (double 4))
-        (println doubled)
-
-        (set doubled (double doubled))
-        (println doubled)
-
-        (def countdown (func (x)
-          (println x)
-          (if x (countdown (- x 1)))))
-        (countdown 5)
+        (println (f 5))
     ";
 
     match parser::parse(input) {
@@ -32,7 +29,7 @@ fn main() {
             for expr in xs.iter() {
                 println!("< {}", expr);
                 match expr.compute(Rc::clone(&scope)) {
-                    Ok(types::RType::List(list)) if list.len() == 0 => println!(""),
+                    Ok(result) if result.is_nil() => println!(""),
                     Ok(result) => println!("> {}\n", result),
                     Err(err) => println!("! {}\n", err),
                 }

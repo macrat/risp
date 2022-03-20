@@ -23,24 +23,40 @@ impl Parser {
         for c in text.chars() {
             match c {
                 '(' => {
-                    self.flush();
+                    if let Err(err) = self.flush() {
+                        return Err(err);
+                    }
                     self.stack.push(RList::empty());
                 }
                 ')' => {
-                    self.flush();
+                    if let Err(err) = self.flush() {
+                        return Err(err);
+                    }
                     self.pop_stack();
                 }
-                ' ' | '\t' | '\r' | '\n' => self.flush(),
+                ' ' | '\t' | '\r' | '\n' => {
+                    if let Err(err) = self.flush() {
+                        return Err(err);
+                    }
+                }
                 _ => self.buf.push(c),
             }
         }
         Ok(())
     }
 
-    fn flush(&mut self) {
-        if self.buf.len() > 0 {
+    pub fn flush(&mut self) -> Result<(), RError> {
+        if self.buf.len() == 0 {
+            Ok(())
+        } else {
             let buf = mem::replace(&mut self.buf, String::new());
-            self.push_stack(RType::parse(buf));
+            match RType::parse(buf) {
+                Ok(x) => {
+                    self.push_stack(x);
+                    Ok(())
+                }
+                Err(err) => Err(err),
+            }
         }
     }
 
@@ -76,13 +92,13 @@ pub fn parse(text: &str) -> Result<RList, RError> {
         return Err(err);
     }
 
-    if !p.is_completed() {
-        return Err(RError::Incompleted(format!(
-            "expression is not completed: {}",
-            p.buf
-        )));
+    if let Err(err) = p.flush() {
+        return Err(err);
     }
 
-    let result = RList::new(p.queue.into());
-    Ok(result)
+    if !p.is_completed() {
+        return Err(RError::Incompleted(p.buf));
+    }
+
+    Ok(RList::new(p.queue.into()))
 }
