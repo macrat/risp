@@ -2,70 +2,101 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::convert::From;
 use std::fmt;
+use std::mem;
 use std::rc::Rc;
 
+#[derive(Debug, Clone, PartialEq)]
+enum RAtom {
+    Symbol(String),
+    Int(i64),
+    String(String),
+}
+
+impl RAtom {
+    fn parse(s: String) -> RAtom {
+        // TODO: make way to parse string
+
+        if let Ok(i) = s.parse::<i64>() {
+            RAtom::Int(i)
+        } else {
+            RAtom::Symbol(s)
+        }
+    }
+
+    fn compute(&self, scope: Rc<RefCell<Scope>>) -> RType {
+        match self {
+            RAtom::Symbol(name) => match scope.borrow().get(name) {
+                Some(val) => val.compute(Rc::clone(&scope)),
+                None => RType::nil(), // TODO: throw exception here?
+            },
+            RAtom::Int(_) => RType::Atom(self.clone()),
+            RAtom::String(_) => RType::Atom(self.clone()),
+        }
+    }
+}
+
+impl fmt::Display for RAtom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RAtom::Symbol(name) => write!(f, "{}", name),
+            RAtom::Int(value) => write!(f, "{}", value),
+            RAtom::String(value) => write!(f, "{}", value),
+        }
+    }
+}
+
 #[derive(Debug)]
-enum RTypeError {
-    IsNotList,
+struct RList(Vec<RType>);
+
+impl RList {
+    fn new() -> RList {
+        RList(Vec::new())
+    }
+
+    fn push(&mut self, val: RType) {
+        self.0.push(val)
+    }
+
+    fn compute(&self, scope: Rc<RefCell<Scope>>) -> RType {
+        let mut result = RList::new();
+        for x in &self.0 {
+            result.push(x.compute(Rc::clone(&scope)));
+        }
+        // TODO: call function here
+        RType::List(result)
+    }
+}
+
+impl fmt::Display for RList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut vec: Vec<String> = Vec::new();
+        for x in &self.0 {
+            vec.push(x.to_string());
+        }
+        write!(f, "({})", vec.join(" "))
+    }
 }
 
 #[derive(Debug)]
 enum RType {
-    Symbol(String),
-    Int(i64),
-    String(String),
+    Atom(RAtom),
+    List(RList),
     // TODO: implement function here
-    Cons(Box<RType>, Box<RType>),
-    Nil,
 }
 
 impl RType {
-    fn pair(car: Box<RType>, cdr: Box<RType>) -> Box<RType> {
-        Box::new(RType::Cons(car, cdr))
+    fn nil() -> RType {
+        RType::List(RList::new())
     }
 
-    fn single(car: Box<RType>) -> Box<RType> {
-        RType::pair(car, Box::new(RType::Nil))
+    fn parse(s: String) -> RType {
+        RType::Atom(RAtom::parse(s))
     }
 
-    fn parse(s: String) -> Box<RType> {
-        // TODO: make way to parse string
-
-        Box::new(if let Ok(i) = s.parse::<i64>() {
-            RType::Int(i)
-        } else {
-            RType::Symbol(s)
-        })
-    }
-
-    fn compute(&self, scope: Rc<RefCell<Scope>>) -> Box<RType> {
-        Box::new(match self {
-            RType::Symbol(name) => match scope.borrow().get(name) {
-                Some(val) => *val.compute(Rc::clone(&scope)),
-                None => RType::Nil,
-            },
-            RType::Int(i) => RType::Int(*i),
-            RType::String(s) => RType::String(s.clone()),
-            RType::Cons(car, cdr) => {
-                RType::Cons((*car).compute(Rc::clone(&scope)), (*cdr).compute(scope))
-            } // TODO: call function here
-            RType::Nil => RType::Nil,
-        })
-    }
-
-    fn push(&mut self, val: Box<RType>) -> Result<(), RTypeError> {
-        let mut cur = self;
-        loop {
-            match cur {
-                RType::Nil => {
-                    *cur = *RType::single(val);
-                    return Ok(());
-                }
-                RType::Cons(_, cdr) => {
-                    cur = &mut **cdr;
-                }
-                _ => return Err(RTypeError::IsNotList),
-            }
+    fn compute(&self, scope: Rc<RefCell<Scope>>) -> RType {
+        match self {
+            RType::Atom(atom) => atom.compute(scope),
+            RType::List(list) => list.compute(scope),
         }
     }
 }
@@ -73,36 +104,9 @@ impl RType {
 impl fmt::Display for RType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RType::Symbol(name) => write!(f, "{}", name),
-            RType::Int(value) => write!(f, "{}", value),
-            RType::String(value) => write!(f, "{}", value),
-            RType::Cons(_, _) => {
-                let mut cur = self;
-                let mut vec: Vec<String> = Vec::new();
-                loop {
-                    match cur {
-                        RType::Nil => break,
-                        RType::Cons(car, cdr) => {
-                            vec.push(format!("{}", *car));
-                            cur = &**cdr;
-                        }
-                        x => {
-                            vec.push(".".to_string());
-                            vec.push(format!("{}", x));
-                            break;
-                        }
-                    }
-                }
-                write!(f, "({})", vec.join(" "))
-            }
-            RType::Nil => write!(f, "()"),
+            RType::Atom(atom) => atom.fmt(f),
+            RType::List(list) => list.fmt(f),
         }
-    }
-}
-
-impl From<i64> for RType {
-    fn from(item: i64) -> RType {
-        RType::Int(item)
     }
 }
 
@@ -110,7 +114,7 @@ impl From<i64> for RType {
 enum Token {
     OpenList,
     CloseList,
-    Value(Box<RType>),
+    Value(RType),
 }
 
 struct TokenIterator<'a> {
@@ -130,13 +134,12 @@ impl TokenIterator<'_> {
 
     fn flush(&mut self) {
         if self.buf.len() > 0 {
-            self.tokens
-                .push_front(Token::Value(RType::parse(self.buf.to_string())));
-            self.buf = String::new()
+            let buf = mem::replace(&mut self.buf, String::new());
+            self.tokens.push_front(Token::Value(RType::parse(buf)));
         }
     }
 
-    fn push(&mut self, c: char) {
+    fn feed(&mut self, c: char) {
         match c {
             '(' => {
                 self.flush();
@@ -158,7 +161,7 @@ impl Iterator for TokenIterator<'_> {
     fn next(&mut self) -> Option<Token> {
         while self.tokens.len() == 0 {
             match self.chars.next() {
-                Some(c) => self.push(c),
+                Some(c) => self.feed(c),
                 None => {
                     self.flush();
                     return self.tokens.pop_back();
@@ -171,7 +174,7 @@ impl Iterator for TokenIterator<'_> {
 
 struct ValueIterator<'a> {
     tokens: &'a mut dyn Iterator<Item = Token>,
-    stack: Vec<Box<RType>>,
+    stack: Vec<RList>,
 }
 
 impl ValueIterator<'_> {
@@ -184,22 +187,21 @@ impl ValueIterator<'_> {
 }
 
 impl Iterator for ValueIterator<'_> {
-    type Item = Box<RType>;
+    type Item = RType;
 
-    fn next(&mut self) -> Option<Box<RType>> {
+    fn next(&mut self) -> Option<RType> {
         loop {
             match self.tokens.next() {
                 Some(Token::OpenList) => {
-                    let list = Box::new(RType::Nil);
-                    self.stack.push(list);
+                    self.stack.push(RList::new());
                 }
                 Some(Token::CloseList) => {
                     if let Some(value) = self.stack.pop() {
                         if let Some(mut last) = self.stack.pop() {
-                            last.push(value);
+                            last.push(RType::List(value));
                             self.stack.push(last);
                         } else {
-                            return Some(value);
+                            return Some(RType::List(value));
                         }
                     }
                 }
@@ -225,7 +227,7 @@ enum NamespaceError {
 #[derive(Debug)]
 struct Scope {
     parent: Option<Rc<RefCell<Scope>>>,
-    values: HashMap<String, Rc<RType>>, // XXX: I really don't like this Rc.
+    values: HashMap<String, Rc<RType>>,
 }
 
 impl Scope {
@@ -248,11 +250,11 @@ impl Scope {
 
     fn define(&mut self, name: String, value: Rc<RType>) -> Result<(), NamespaceError> {
         if self.is_exist(&name) {
-            return Err(NamespaceError::AlreadyExist);
+            Err(NamespaceError::AlreadyExist)
+        } else {
+            self.values.insert(name, value);
+            Ok(())
         }
-
-        self.values.insert(name, value);
-        Ok(())
     }
 
     fn get(&self, name: &String) -> Option<Rc<RType>> {
@@ -282,11 +284,11 @@ fn main() {
     let child = Scope::new(Some(Rc::clone(&parent)));
     (*parent).borrow_mut().define(
         String::from("hello"),
-        Rc::new(RType::String(String::from("world"))),
+        Rc::new(RType::Atom(RAtom::String(String::from("world")))),
     );
     (*child)
         .borrow_mut()
-        .define(String::from("abc"), Rc::new(RType::Int(123)));
+        .define(String::from("abc"), Rc::new(RType::Atom(RAtom::Int(123))));
     println!(
         "child.hello = {:?}",
         child.borrow().get(&String::from("hello"))
