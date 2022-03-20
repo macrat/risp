@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::{Index, RangeFrom};
 use std::rc::Rc;
 
-use super::scope::Scope;
+use crate::scope::Scope;
 
 #[derive(Debug)]
 pub enum RError {
@@ -12,6 +12,7 @@ pub enum RError {
     AlreadyExist(String),
     NotExist(String),
     Argument(String),
+    Incompleted(String),
 }
 
 impl fmt::Display for RError {
@@ -21,6 +22,7 @@ impl fmt::Display for RError {
             RError::AlreadyExist(reason) => write!(f, "AlreadyExistError: {}", reason),
             RError::NotExist(reason) => write!(f, "NotExistError: {}", reason),
             RError::Argument(reason) => write!(f, "ArgumentError: {}", reason),
+            RError::Incompleted(reason) => write!(f, "IncompletedError: {}", reason),
         }
     }
 }

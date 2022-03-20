@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
-use super::scope::Scope;
-use super::types::*;
+use crate::scope::Scope;
+use crate::types::*;
 
 #[derive(Debug)]
 struct Func;

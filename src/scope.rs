@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
-use super::types::{RError, RType};
+use crate::types::{RError, RType};
 
 #[derive(Debug)]
 pub struct Scope {
