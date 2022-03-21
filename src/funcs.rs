@@ -14,7 +14,7 @@ impl Callable for Func {
         "func"
     }
 
-    fn call(&self, args: RList, _: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
         Ok(RType::Func(Rc::new(RFunc::Pure {
             args: match &args[0] {
                 RType::List(list) => {
@@ -37,6 +37,7 @@ impl Callable for Func {
                 }
             },
             body: RList::from(&args[1..]),
+            capture: Rc::clone(&scope),
         })))
     }
 }
@@ -168,7 +169,7 @@ impl Callable for Do {
     }
 
     fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
-        args.compute_last(Rc::clone(&scope))
+        args.compute_last(Scope::new(Some(scope)))
     }
 }
 
@@ -695,14 +696,33 @@ mod test {
             r"
                 (def f (func (x)
                   (def loop (func (n)
-                    (if (- n 1) (do
+                    (if (> n 1) (do
                       (set x (* x n))
                       (loop (- n 1))))
                       x))
                   (loop (- x 1))))
                 (f 5)
             ",
-        )
+        );
+
+        assert_atom(
+            RAtom::Int(1),
+            r#"
+                (def counter (do
+                  (def x 0)
+                  (func ()
+                    (set x (+ x 1))
+                    x)))
+
+                (def xs (list
+                  (counter)
+                  (counter)
+                  (counter)))
+
+                (println "xs =" xs)
+                (= xs (list 1 2 3))
+            "#,
+        );
     }
 
     #[test]
@@ -809,7 +829,6 @@ mod test {
             assert_atom(RAtom::Int(1), "(= 1 1)");
             assert_atom(RAtom::Int(0), "(= 1 2)");
             assert_atom(RAtom::Int(1), "(= 2 2)");
-
             assert_atom(RAtom::Int(1), "(= (list 1 2 3) (list 1 2 3))");
             assert_atom(RAtom::Int(0), "(= (list 1 2 4) (list 1 2 3))");
             assert_atom(RAtom::Int(0), "(= (list 1 2 3 4) (list 1 2 3))");

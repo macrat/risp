@@ -252,14 +252,18 @@ impl fmt::Debug for dyn Callable {
 
 #[derive(Debug)]
 pub enum RFunc {
-    Pure { args: Vec<String>, body: RList },
+    Pure {
+        args: Vec<String>,
+        body: RList,
+        capture: Rc<RefCell<Scope>>,
+    },
     Binary(Box<dyn Callable>),
 }
 
 impl Callable for RFunc {
     fn name(&self) -> &str {
         match self {
-            RFunc::Pure { args: _, body: _ } => "unnamed_function",
+            RFunc::Pure { .. } => "pure-func",
             RFunc::Binary(c) => c.name(),
         }
     }
@@ -269,8 +273,9 @@ impl Callable for RFunc {
             RFunc::Pure {
                 args: arg_names,
                 body,
+                capture,
             } => {
-                let local = Scope::new(Some(Rc::clone(&scope)));
+                let local = Scope::new(Some(Rc::clone(&capture)));
                 if args.0.len() != arg_names.len() {
                     return Err(RError::Argument(format!(
                         "this function needs {} arguments but got {} arguments.",
@@ -306,7 +311,7 @@ impl Callable for RFunc {
 impl fmt::Display for RFunc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RFunc::Pure { args, body } => {
+            RFunc::Pure { args, body, .. } => {
                 write!(f, "(func ({}) {})", args.join(" "), body.to_bare_string())
             }
             RFunc::Binary(c) => write!(f, "{}", *c),
