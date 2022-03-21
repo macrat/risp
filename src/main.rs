@@ -13,11 +13,12 @@ fn compute(scope: &Rc<RefCell<scope::Scope>>, parser: &mut parser::Parser, show_
             Some(expr) => match expr.compute(Rc::clone(scope)) {
                 Ok(result) if !result.is_nil() && show_prompt => println!("< {}", result),
                 Ok(_) => {}
+                Err(err) if show_prompt => {
+                    println!("! {}", err);
+                }
                 Err(err) => {
-                    if !show_prompt {
-                        println!("> {}", expr);
-                    }
-                    println!("! {}\n", err);
+                    println!("> {}", expr);
+                    println!("! {}", err);
                     std::process::exit(1);
                 }
             },
@@ -65,7 +66,11 @@ fn main() {
             Ok(_) => {
                 if let Err(err) = parser.feed(input.as_str()) {
                     println!("! {}", err);
-                    std::process::exit(1);
+                    if show_prompt {
+                        parser = parser::Parser::new();
+                    } else {
+                        std::process::exit(1);
+                    }
                 }
 
                 compute(&scope, &mut parser, show_prompt);
