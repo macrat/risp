@@ -330,15 +330,27 @@ pub fn register_to(scope: &mut Scope) -> Result<(), RError> {
                 )));
             }
 
-            let mut result = 0;
-            for x in xs {
-                if let RType::Atom(RAtom::Int(x)) = x {
-                    result += x;
-                } else {
-                    return Err(RError::Type(format!("`+` can not apply to `{}`", x)));
+            if let RType::Atom(RAtom::String(_)) = xs[0] {
+                let mut result = String::new();
+                for x in xs {
+                    if let RType::Atom(RAtom::String(x)) = x {
+                        result += &x;
+                    } else {
+                        return Err(RError::Type(format!("`+` can not apply to `{}`", x)));
+                    }
                 }
+                Ok(RType::Atom(RAtom::String(result)))
+            } else {
+                let mut result = 0;
+                for x in xs {
+                    if let RType::Atom(RAtom::Int(x)) = x {
+                        result += x;
+                    } else {
+                        return Err(RError::Type(format!("`+` can not apply to `{}`", x)));
+                    }
+                }
+                Ok(RType::Atom(RAtom::Int(result)))
             }
-            Ok(RType::Atom(RAtom::Int(result)))
         }))
     );
 
@@ -446,7 +458,7 @@ mod test {
         };
     }
 
-    fn assert_atom(code: &str, expect: RAtom) {
+    fn assert_atom(expect: RAtom, code: &str) {
         match execute(code) {
             Ok(RType::Atom(x)) => assert_eq!(expect, x),
             Ok(x) => panic!("expected {} but got {}", expect, x),
@@ -454,7 +466,7 @@ mod test {
         }
     }
 
-    fn assert_err(code: &str, expect: RError) {
+    fn assert_err(expect: RError, code: &str) {
         match execute(code) {
             Err(err) => assert_eq!(expect, err),
             Ok(x) => panic!("expected error but got {}", x),
@@ -464,71 +476,92 @@ mod test {
     #[test]
     fn plus() {
         assert_err(
-            "(+)",
             RError::Argument(String::from("`+` needs at least 1 value.")),
+            "(+)",
         );
-        assert_atom("(+ 1)", RAtom::Int(1));
-        assert_atom("(+ 1 2)", RAtom::Int(3));
-        assert_atom("(+ 1 2 3 4 5)", RAtom::Int(15));
-        assert_atom("(+ 1 (+ 2 3) 4 5)", RAtom::Int(15));
+
+        assert_atom(RAtom::Int(1), "(+ 1)");
+        assert_atom(RAtom::Int(3), "(+ 1 2)");
+        assert_atom(RAtom::Int(15), "(+ 1 2 3 4 5)");
+        assert_atom(RAtom::Int(15), "(+ 1 (+ 2 3) 4 5)");
+
+        assert_atom(RAtom::String(String::from("hello")), r#"(+ "hello")"#);
+        assert_atom(
+            RAtom::String(String::from("helloworld")),
+            r#"(+ "hello" "world")"#,
+        );
+        assert_atom(
+            RAtom::String(String::from("hello world")),
+            r#"(+ "hello" " " "world")"#,
+        );
+
+        assert_err(
+            RError::Type(String::from("`+` can not apply to `123`")),
+            r#"(+ "hello" 123)"#,
+        );
+        assert_err(
+            RError::Type(String::from("`+` can not apply to `hello`")),
+            r#"(+ 123 "hello")"#,
+        );
     }
 
     #[test]
     fn minus() {
         assert_err(
-            "(-)",
             RError::Argument(String::from("`-` needs at least 1 value.")),
+            "(-)",
         );
-        assert_atom("(- 1)", RAtom::Int(-1));
-        assert_atom("(- 1 2)", RAtom::Int(-1));
-        assert_atom("(- 1 2 3 4 5)", RAtom::Int(-13));
-        assert_atom("(- 1 (- 2 3) 4 5)", RAtom::Int(-7));
+        assert_atom(RAtom::Int(-1), "(- 1)");
+        assert_atom(RAtom::Int(-1), "(- 1 2)");
+        assert_atom(RAtom::Int(-13), "(- 1 2 3 4 5)");
+        assert_atom(RAtom::Int(-7), "(- 1 (- 2 3) 4 5)");
     }
 
     #[test]
     fn multiply() {
         assert_err(
-            "(*)",
             RError::Argument(String::from("`*` needs at least 2 values.")),
+            "(*)",
         );
         assert_err(
-            "(* 1)",
             RError::Argument(String::from("`*` needs at least 2 values.")),
+            "(* 1)",
         );
-        assert_atom("(* 1 2)", RAtom::Int(2));
-        assert_atom("(* 1 2 3 4 5)", RAtom::Int(120));
+        assert_atom(RAtom::Int(2), "(* 1 2)");
+        assert_atom(RAtom::Int(120), "(* 1 2 3 4 5)");
     }
 
     #[test]
     fn divide() {
         assert_err(
-            "(/)",
             RError::Argument(String::from("`/` needs at least 2 values.")),
+            "(/)",
         );
         assert_err(
-            "(/ 1)",
             RError::Argument(String::from("`/` needs at least 2 values.")),
+            "(/ 1)",
         );
-        assert_atom("(/ 4 2)", RAtom::Int(2));
-        assert_atom("(/ 20 2 2)", RAtom::Int(5));
+        assert_atom(RAtom::Int(2), "(/ 4 2)");
+        assert_atom(RAtom::Int(5), "(/ 20 2 2)");
     }
 
     #[test]
     fn def_and_set() {
-        assert_atom("(def x 42) x", RAtom::Int(42));
-        assert_atom("(def x (+ 1 2)) x", RAtom::Int(3));
+        assert_atom(RAtom::Int(42), "(def x 42) x");
+        assert_atom(RAtom::Int(3), "(def x (+ 1 2)) x");
 
         assert_err(
-            "(def x 1) (def x 2)",
             RError::AlreadyExist(String::from("x")),
+            "(def x 1) (def x 2)",
         );
-        assert_atom("(def x 1) (set x 2) x", RAtom::Int(2));
-        assert_err("(set x 3) x", RError::NotExist(String::from("x")));
+        assert_atom(RAtom::Int(2), "(def x 1) (set x 2) x");
+        assert_err(RError::NotExist(String::from("x")), "(set x 3) x");
     }
 
     #[test]
     fn func() {
         assert_atom(
+            RAtom::Int(120),
             r"
                 (def f (func (x)
                   (def loop (func (n)
@@ -539,28 +572,28 @@ mod test {
                   (loop (- x 1))))
                 (f 5)
             ",
-            RAtom::Int(120),
         )
     }
 
     #[test]
     fn list_car_cdr() {
-        assert_atom("(car (list 123 456))", RAtom::Int(123));
-        assert_atom("(car (cdr (list 123 456)))", RAtom::Int(456));
+        assert_atom(RAtom::Int(123), "(car (list 123 456))");
+        assert_atom(RAtom::Int(456), "(car (cdr (list 123 456)))");
 
         assert_atom(
+            RAtom::Int(12),
             r"
                 (def xs (list 12 34))
                 (def ys xs)
                 (car ys)
             ",
-            RAtom::Int(12),
         );
     }
 
     #[test]
     fn if_() {
         assert_atom(
+            RAtom::Int(1),
             r"
                 (def result 0)
                 (if true
@@ -568,10 +601,10 @@ mod test {
                   (set result 2))
                 result
             ",
-            RAtom::Int(1),
         );
 
         assert_atom(
+            RAtom::Int(2),
             r"
                 (def result 0)
                 (if false
@@ -579,10 +612,10 @@ mod test {
                   (set result 2))
                 result
             ",
-            RAtom::Int(2),
         );
 
         assert_atom(
+            RAtom::Int(2),
             r"
                 (def result 0)
                 (if nil
@@ -590,30 +623,29 @@ mod test {
                   (set result 2))
                 result
             ",
-            RAtom::Int(2),
         );
     }
 
     #[test]
     fn compare() {
-        assert_atom("(= 1 1)", RAtom::Int(1));
-        assert_atom("(= 1 2)", RAtom::Int(0));
-        assert_atom("(= 2 2)", RAtom::Int(1));
+        assert_atom(RAtom::Int(1), "(= 1 1)");
+        assert_atom(RAtom::Int(0), "(= 1 2)");
+        assert_atom(RAtom::Int(1), "(= 2 2)");
 
-        assert_atom("(= (list 1 2 3) (list 1 2 3))", RAtom::Int(1));
-        assert_atom("(= (list 1 2 4) (list 1 2 3))", RAtom::Int(0));
-        assert_atom("(= (list 1 2 3 4) (list 1 2 3))", RAtom::Int(0));
-        assert_atom("(= (list) (list))", RAtom::Int(1));
+        assert_atom(RAtom::Int(1), "(= (list 1 2 3) (list 1 2 3))");
+        assert_atom(RAtom::Int(0), "(= (list 1 2 4) (list 1 2 3))");
+        assert_atom(RAtom::Int(0), "(= (list 1 2 3 4) (list 1 2 3))");
+        assert_atom(RAtom::Int(1), "(= (list) (list))");
 
-        assert_atom("(= println println)", RAtom::Int(1));
-        assert_atom("(= if println)", RAtom::Int(0));
+        assert_atom(RAtom::Int(1), "(= println println)");
+        assert_atom(RAtom::Int(0), "(= if println)");
 
-        assert_atom("(def f (func ())) (= f f)", RAtom::Int(1));
-        assert_atom("(def f (func ())) (= f (func ()))", RAtom::Int(0));
+        assert_atom(RAtom::Int(1), "(def f (func ())) (= f f)");
+        assert_atom(RAtom::Int(0), "(def f (func ())) (= f (func ()))");
 
-        assert_atom("(!= 1 1)", RAtom::Int(0));
-        assert_atom("(!= 1 2)", RAtom::Int(1));
-        assert_atom("(!= if if)", RAtom::Int(0));
-        assert_atom("(!= if println)", RAtom::Int(1));
+        assert_atom(RAtom::Int(0), "(!= 1 1)");
+        assert_atom(RAtom::Int(1), "(!= 1 2)");
+        assert_atom(RAtom::Int(0), "(!= if if)");
+        assert_atom(RAtom::Int(1), "(!= if println)");
     }
 }

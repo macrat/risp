@@ -13,7 +13,13 @@ pub enum RError {
     NotExist(String),
     Argument(String),
     Incompleted(String),
-    InvalidSymbol(String),
+    InvalidLiteral(String),
+    InvalidEscape(char),
+}
+
+fn escape_string(s: &String) -> String {
+    let s = format!("{:?}", s);
+    s[1..s.len() - 1].to_string()
 }
 
 impl fmt::Display for RError {
@@ -26,9 +32,22 @@ impl fmt::Display for RError {
             RError::NotExist(name) => write!(f, "NotExistError: `{}` does not exist.", name),
             RError::Argument(reason) => write!(f, "ArgumentError: {}", reason),
             RError::Incompleted(buf) => {
-                write!(f, "IncompletedError: expression is not completed: {}", buf)
+                write!(
+                    f,
+                    "IncompletedError: expression is not completed: {}",
+                    escape_string(buf)
+                )
             }
-            RError::InvalidSymbol(c) => write!(f, "InvalidSymbolError: `{}` is invalid symbol.", c),
+            RError::InvalidLiteral(literal) => write!(
+                f,
+                "InvalidLiteralError: `{}...` is invalid literal.",
+                escape_string(literal),
+            ),
+            RError::InvalidEscape(c) => write!(
+                f,
+                "InvalidEscapeError: `\\{}` is invalid escape in string.",
+                c
+            ),
         }
     }
 }
@@ -40,29 +59,7 @@ pub enum RAtom {
     String(String),
 }
 
-fn is_valid_symbol(s: &String) -> bool {
-    if let Some(c) = s.chars().next() {
-        !('0' <= c && c <= '9')
-    } else {
-        false
-    }
-}
-
 impl RAtom {
-    fn parse(s: String) -> Result<RAtom, RError> {
-        // TODO: make way to parse string
-
-        if s.len() == 0 {
-            Err(RError::InvalidSymbol(String::new()))
-        } else if let Ok(i) = s.parse::<i64>() {
-            Ok(RAtom::Int(i))
-        } else if !is_valid_symbol(&s) {
-            Err(RError::InvalidSymbol(s))
-        } else {
-            Ok(RAtom::Symbol(s))
-        }
-    }
-
     fn compute(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
         match self {
             RAtom::Symbol(name) => match scope.borrow().get(name) {
@@ -317,13 +314,6 @@ impl RType {
         RType::List(RList::empty())
     }
 
-    pub fn parse(s: String) -> Result<RType, RError> {
-        match RAtom::parse(s) {
-            Ok(x) => Ok(RType::Atom(x)),
-            Err(err) => Err(err),
-        }
-    }
-
     pub fn compute(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
         match self {
             RType::Atom(atom) => atom.compute(scope),
@@ -378,45 +368,5 @@ impl std::cmp::PartialEq for RType {
             (RType::Func(a), RType::Func(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn parse_int() {
-        assert_eq!(RAtom::parse(String::from("42")), Ok(RAtom::Int(42)));
-        assert_eq!(RAtom::parse(String::from("-1")), Ok(RAtom::Int(-1)));
-        assert_eq!(RAtom::parse(String::from("0")), Ok(RAtom::Int(0)));
-    }
-
-    #[test]
-    fn parse_symbol() {
-        assert_eq!(
-            RAtom::parse(String::from("hello")),
-            Ok(RAtom::Symbol(String::from("hello")))
-        );
-        assert_eq!(
-            RAtom::parse(String::from("A")),
-            Ok(RAtom::Symbol(String::from("A")))
-        );
-        assert_eq!(
-            RAtom::parse(String::from("日本語")),
-            Ok(RAtom::Symbol(String::from("日本語")))
-        );
-    }
-
-    #[test]
-    fn parse_invalid() {
-        assert_eq!(
-            RAtom::parse(String::from("")),
-            Err(RError::InvalidSymbol(String::from("")))
-        );
-        assert_eq!(
-            RAtom::parse(String::from("1hello")),
-            Err(RError::InvalidSymbol(String::from("1hello")))
-        );
     }
 }
