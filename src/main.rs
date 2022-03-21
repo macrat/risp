@@ -44,7 +44,10 @@ fn main() {
 
         input.clear();
         match stdin.read_line(&mut input) {
-            Ok(0) => break,
+            Ok(0) => {
+                println!("");
+                break;
+            }
             Ok(_) => {
                 if let Err(err) = parser.feed(input.as_str()) {
                     println!("! {}", err);
@@ -60,7 +63,7 @@ fn main() {
         }
     }
 
-    if let Err(err) = parser.flush() {
+    if let Err(err) = parser.close() {
         println!("! {}", err);
         std::process::exit(1);
     }

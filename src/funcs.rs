@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::fmt;
 use std::rc::Rc;
 
@@ -109,17 +110,17 @@ impl Callable for Set {
 }
 
 #[derive(Debug)]
-struct Println;
+struct Print<'a>(&'a str, &'a str);
 
-impl Callable for Println {
+impl Callable for Print<'_> {
     fn name(&self) -> &str {
-        "println"
+        self.0
     }
 
     fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
         match args.compute_each(scope) {
             Ok(x) => {
-                println!("{}", x.to_bare_string());
+                print!("{}{}", x.to_bare_string(), self.1);
                 Ok(RType::nil())
             }
             Err(err) => Err(err),
@@ -159,6 +160,19 @@ impl Callable for If {
 }
 
 #[derive(Debug)]
+struct Do;
+
+impl Callable for Do {
+    fn name(&self) -> &str {
+        "do"
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        args.compute_last(Rc::clone(&scope))
+    }
+}
+
+#[derive(Debug)]
 struct List;
 
 impl Callable for List {
@@ -191,7 +205,14 @@ impl Callable for Car {
         } else {
             match args[0].compute(scope) {
                 Ok(RType::List(list)) => Ok(list[0].clone()),
-                Ok(x) => Err(RError::Type(format!("`car` needs list but got {}", x))),
+                Ok(RType::Atom(RAtom::String(x))) => match x.chars().next() {
+                    Some(c) => Ok(RType::Atom(RAtom::String(c.into()))),
+                    None => Ok(RType::Atom(RAtom::String(String::new()))),
+                },
+                Ok(x) => Err(RError::Type(format!(
+                    "`car` needs list or string but got {}",
+                    x
+                ))),
                 Err(err) => Err(err),
             }
         }
@@ -215,7 +236,15 @@ impl Callable for Cdr {
         } else {
             match args[0].compute(scope) {
                 Ok(RType::List(list)) => Ok(RType::List(RList::from(&list[1..]))),
-                Ok(x) => Err(RError::Type(format!("`cdr` needs list but got {}", x))),
+                Ok(RType::Atom(RAtom::String(x))) => {
+                    let mut chars = x.chars();
+                    chars.next();
+                    Ok(RType::Atom(RAtom::String(chars.as_str().into())))
+                }
+                Ok(x) => Err(RError::Type(format!(
+                    "`cdr` needs list or string but got {}",
+                    x
+                ))),
                 Err(err) => Err(err),
             }
         }
@@ -242,7 +271,7 @@ impl Callable for CalculateOperator<'_> {
     }
 }
 
-struct CompareOperator<'a>(&'a str, fn(&RType, &RType) -> bool);
+struct CompareOperator<'a>(&'a str, fn(&RType, &RType) -> Result<bool, RError>);
 
 impl Callable for CompareOperator<'_> {
     fn name(&self) -> &str {
@@ -265,8 +294,10 @@ impl Callable for CompareOperator<'_> {
         for y in &args[1..] {
             match y.compute(Rc::clone(&scope)) {
                 Ok(y) => {
-                    if !self.1(&x, &y) {
-                        return Ok(RType::Atom(RAtom::Int(0)));
+                    match self.1(&x, &y) {
+                        Ok(false) => return Ok(RType::Atom(RAtom::Int(0))),
+                        Err(err) => return Err(err),
+                        _ => {}
                     }
                     x = y;
                 }
@@ -275,6 +306,42 @@ impl Callable for CompareOperator<'_> {
         }
 
         Ok(RType::Atom(RAtom::Int(1)))
+    }
+}
+
+macro_rules! ordering_rule {
+    ($order:expr, true) => {
+        |x, y| match x.cmp(y) {
+            Ok(order) => Ok(order == $order),
+            Err(err) => Err(err),
+        }
+    };
+    ($order:expr, false) => {
+        |x, y| match x.cmp(y) {
+            Ok(order) => Ok(order != $order),
+            Err(err) => Err(err),
+        }
+    };
+}
+
+struct TypeCheckOperator<'a>(&'a str, fn(&RType) -> bool);
+
+impl Callable for TypeCheckOperator<'_> {
+    fn name(&self) -> &str {
+        self.0
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        for x in args.iter() {
+            match x.compute(Rc::clone(&scope)) {
+                Ok(x) if self.1(&x) => {
+                    return Ok(RType::Atom(RAtom::Int(1)));
+                }
+                Err(err) => return Err(err),
+                _ => {}
+            }
+        }
+        Ok(RType::Atom(RAtom::Int(0)))
     }
 }
 
@@ -293,31 +360,89 @@ macro_rules! register {
 }
 
 pub fn register_to(scope: &mut Scope) -> Result<(), RError> {
-    register!(scope, "true", Rc::new(RType::Atom(RAtom::Int(1))));
-    register!(scope, "false", Rc::new(RType::Atom(RAtom::Int(0))));
-    register!(scope, "nil", Rc::new(RType::nil()));
-
     register!(scope, "def", binary_func!(Def));
     register!(scope, "set", binary_func!(Set));
 
     register!(scope, "func", binary_func!(Func));
-    register!(scope, "println", binary_func!(Println));
-
-    register!(scope, "if", binary_func!(If));
 
     register!(scope, "list", binary_func!(List));
     register!(scope, "car", binary_func!(Car));
     register!(scope, "cdr", binary_func!(Cdr));
 
+    register!(scope, "print", binary_func!(Print("println", "")));
+    register!(scope, "println", binary_func!(Print("println", "\n")));
+
+    register!(scope, "if", binary_func!(If));
+    register!(scope, "do", binary_func!(Do));
+
+    register!(
+        scope,
+        "is-int",
+        binary_func!(TypeCheckOperator("is-int", |x| match x {
+            RType::Atom(RAtom::Int(_)) => true,
+            _ => false,
+        }))
+    );
+    register!(
+        scope,
+        "is-string",
+        binary_func!(TypeCheckOperator("is-string", |x| match x {
+            RType::Atom(RAtom::String(_)) => true,
+            _ => false,
+        }))
+    );
+    register!(
+        scope,
+        "is-list",
+        binary_func!(TypeCheckOperator("is-list", |x| match x {
+            RType::List(_) => true,
+            _ => false,
+        }))
+    );
+    register!(
+        scope,
+        "is-func",
+        binary_func!(TypeCheckOperator("is-func", |x| match x {
+            RType::Func(_) => true,
+            _ => false,
+        }))
+    );
+
     register!(
         scope,
         "=",
-        binary_func!(CompareOperator("=", |x, y| *x == *y))
+        binary_func!(CompareOperator("=", |x, y| Ok(*x == *y)))
     );
     register!(
         scope,
         "!=",
-        binary_func!(CompareOperator("!=", |x, y| *x != *y))
+        binary_func!(CompareOperator("!=", |x, y| Ok(*x != *y)))
+    );
+    register!(
+        scope,
+        "<",
+        binary_func!(CompareOperator("<", ordering_rule!(Ordering::Less, true)))
+    );
+    register!(
+        scope,
+        ">",
+        binary_func!(CompareOperator(
+            ">",
+            ordering_rule!(Ordering::Greater, true)
+        ))
+    );
+    register!(
+        scope,
+        "<=",
+        binary_func!(CompareOperator(
+            "<=",
+            ordering_rule!(Ordering::Greater, false)
+        ))
+    );
+    register!(
+        scope,
+        ">=",
+        binary_func!(CompareOperator(">=", ordering_rule!(Ordering::Less, false)))
     );
 
     register!(
@@ -446,7 +571,7 @@ pub fn register_to(scope: &mut Scope) -> Result<(), RError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parser::parse;
+    use crate::parser::test::parse;
 
     fn execute(code: &str) -> Result<RType, RError> {
         let scope = Scope::new(None);
@@ -473,76 +598,81 @@ mod test {
         }
     }
 
-    #[test]
-    fn plus() {
-        assert_err(
-            RError::Argument(String::from("`+` needs at least 1 value.")),
-            "(+)",
-        );
+    #[cfg(test)]
+    mod calc {
+        use super::*;
 
-        assert_atom(RAtom::Int(1), "(+ 1)");
-        assert_atom(RAtom::Int(3), "(+ 1 2)");
-        assert_atom(RAtom::Int(15), "(+ 1 2 3 4 5)");
-        assert_atom(RAtom::Int(15), "(+ 1 (+ 2 3) 4 5)");
+        #[test]
+        fn plus() {
+            assert_err(
+                RError::Argument(String::from("`+` needs at least 1 value.")),
+                "(+)",
+            );
 
-        assert_atom(RAtom::String(String::from("hello")), r#"(+ "hello")"#);
-        assert_atom(
-            RAtom::String(String::from("helloworld")),
-            r#"(+ "hello" "world")"#,
-        );
-        assert_atom(
-            RAtom::String(String::from("hello world")),
-            r#"(+ "hello" " " "world")"#,
-        );
+            assert_atom(RAtom::Int(1), "(+ 1)");
+            assert_atom(RAtom::Int(3), "(+ 1 2)");
+            assert_atom(RAtom::Int(15), "(+ 1 2 3 4 5)");
+            assert_atom(RAtom::Int(15), "(+ 1 (+ 2 3) 4 5)");
 
-        assert_err(
-            RError::Type(String::from("`+` can not apply to `123`")),
-            r#"(+ "hello" 123)"#,
-        );
-        assert_err(
-            RError::Type(String::from("`+` can not apply to `hello`")),
-            r#"(+ 123 "hello")"#,
-        );
-    }
+            assert_atom(RAtom::String(String::from("hello")), r#"(+ "hello")"#);
+            assert_atom(
+                RAtom::String(String::from("helloworld")),
+                r#"(+ "hello" "world")"#,
+            );
+            assert_atom(
+                RAtom::String(String::from("hello world")),
+                r#"(+ "hello" " " "world")"#,
+            );
 
-    #[test]
-    fn minus() {
-        assert_err(
-            RError::Argument(String::from("`-` needs at least 1 value.")),
-            "(-)",
-        );
-        assert_atom(RAtom::Int(-1), "(- 1)");
-        assert_atom(RAtom::Int(-1), "(- 1 2)");
-        assert_atom(RAtom::Int(-13), "(- 1 2 3 4 5)");
-        assert_atom(RAtom::Int(-7), "(- 1 (- 2 3) 4 5)");
-    }
+            assert_err(
+                RError::Type(String::from("`+` can not apply to `123`")),
+                r#"(+ "hello" 123)"#,
+            );
+            assert_err(
+                RError::Type(String::from("`+` can not apply to `hello`")),
+                r#"(+ 123 "hello")"#,
+            );
+        }
 
-    #[test]
-    fn multiply() {
-        assert_err(
-            RError::Argument(String::from("`*` needs at least 2 values.")),
-            "(*)",
-        );
-        assert_err(
-            RError::Argument(String::from("`*` needs at least 2 values.")),
-            "(* 1)",
-        );
-        assert_atom(RAtom::Int(2), "(* 1 2)");
-        assert_atom(RAtom::Int(120), "(* 1 2 3 4 5)");
-    }
+        #[test]
+        fn minus() {
+            assert_err(
+                RError::Argument(String::from("`-` needs at least 1 value.")),
+                "(-)",
+            );
+            assert_atom(RAtom::Int(-1), "(- 1)");
+            assert_atom(RAtom::Int(-1), "(- 1 2)");
+            assert_atom(RAtom::Int(-13), "(- 1 2 3 4 5)");
+            assert_atom(RAtom::Int(-7), "(- 1 (- 2 3) 4 5)");
+        }
 
-    #[test]
-    fn divide() {
-        assert_err(
-            RError::Argument(String::from("`/` needs at least 2 values.")),
-            "(/)",
-        );
-        assert_err(
-            RError::Argument(String::from("`/` needs at least 2 values.")),
-            "(/ 1)",
-        );
-        assert_atom(RAtom::Int(2), "(/ 4 2)");
-        assert_atom(RAtom::Int(5), "(/ 20 2 2)");
+        #[test]
+        fn multiply() {
+            assert_err(
+                RError::Argument(String::from("`*` needs at least 2 values.")),
+                "(*)",
+            );
+            assert_err(
+                RError::Argument(String::from("`*` needs at least 2 values.")),
+                "(* 1)",
+            );
+            assert_atom(RAtom::Int(2), "(* 1 2)");
+            assert_atom(RAtom::Int(120), "(* 1 2 3 4 5)");
+        }
+
+        #[test]
+        fn divide() {
+            assert_err(
+                RError::Argument(String::from("`/` needs at least 2 values.")),
+                "(/)",
+            );
+            assert_err(
+                RError::Argument(String::from("`/` needs at least 2 values.")),
+                "(/ 1)",
+            );
+            assert_atom(RAtom::Int(2), "(/ 4 2)");
+            assert_atom(RAtom::Int(5), "(/ 20 2 2)");
+        }
     }
 
     #[test]
@@ -565,10 +695,10 @@ mod test {
             r"
                 (def f (func (x)
                   (def loop (func (n)
-                    (if (- n 1) ((func ()
+                    (if (- n 1) (do
                       (set x (* x n))
                       (loop (- n 1))))
-                      x)))
+                      x))
                   (loop (- x 1))))
                 (f 5)
             ",
@@ -591,12 +721,19 @@ mod test {
     }
 
     #[test]
+    fn string_car_cdr() {
+        assert_atom(RAtom::String("h".into()), r#"(car "hello")"#);
+        assert_atom(RAtom::String("e".into()), r#"(car (cdr "hello"))"#);
+        assert_atom(RAtom::String("llo".into()), r#"(cdr (cdr "hello"))"#);
+    }
+
+    #[test]
     fn if_() {
         assert_atom(
             RAtom::Int(1),
             r"
                 (def result 0)
-                (if true
+                (if 1
                   (set result 1)
                   (set result 2))
                 result
@@ -607,7 +744,7 @@ mod test {
             RAtom::Int(2),
             r"
                 (def result 0)
-                (if false
+                (if 0
                   (set result 1)
                   (set result 2))
                 result
@@ -618,7 +755,7 @@ mod test {
             RAtom::Int(2),
             r"
                 (def result 0)
-                (if nil
+                (if ()
                   (set result 1)
                   (set result 2))
                 result
@@ -626,26 +763,144 @@ mod test {
         );
     }
 
-    #[test]
-    fn compare() {
-        assert_atom(RAtom::Int(1), "(= 1 1)");
-        assert_atom(RAtom::Int(0), "(= 1 2)");
-        assert_atom(RAtom::Int(1), "(= 2 2)");
+    #[cfg(test)]
+    mod type_check {
+        use super::*;
 
-        assert_atom(RAtom::Int(1), "(= (list 1 2 3) (list 1 2 3))");
-        assert_atom(RAtom::Int(0), "(= (list 1 2 4) (list 1 2 3))");
-        assert_atom(RAtom::Int(0), "(= (list 1 2 3 4) (list 1 2 3))");
-        assert_atom(RAtom::Int(1), "(= (list) (list))");
+        #[test]
+        fn is_int() {
+            assert_atom(RAtom::Int(1), "(is-int 2)");
+            assert_atom(RAtom::Int(0), "(is-int \"hello\")");
+            assert_atom(RAtom::Int(0), "(is-int (list 12 34))");
+            assert_atom(RAtom::Int(0), "(is-int if)");
+        }
 
-        assert_atom(RAtom::Int(1), "(= println println)");
-        assert_atom(RAtom::Int(0), "(= if println)");
+        #[test]
+        fn is_string() {
+            assert_atom(RAtom::Int(0), "(is-string 2)");
+            assert_atom(RAtom::Int(1), "(is-string \"hello\")");
+            assert_atom(RAtom::Int(0), "(is-string (list 12 34))");
+            assert_atom(RAtom::Int(0), "(is-string if)");
+        }
 
-        assert_atom(RAtom::Int(1), "(def f (func ())) (= f f)");
-        assert_atom(RAtom::Int(0), "(def f (func ())) (= f (func ()))");
+        #[test]
+        fn is_list() {
+            assert_atom(RAtom::Int(0), "(is-list 2)");
+            assert_atom(RAtom::Int(0), "(is-list \"hello\")");
+            assert_atom(RAtom::Int(1), "(is-list (list 12 34))");
+            assert_atom(RAtom::Int(0), "(is-list if)");
+        }
 
-        assert_atom(RAtom::Int(0), "(!= 1 1)");
-        assert_atom(RAtom::Int(1), "(!= 1 2)");
-        assert_atom(RAtom::Int(0), "(!= if if)");
-        assert_atom(RAtom::Int(1), "(!= if println)");
+        #[test]
+        fn is_func() {
+            assert_atom(RAtom::Int(0), "(is-func 2)");
+            assert_atom(RAtom::Int(0), "(is-func \"hello\")");
+            assert_atom(RAtom::Int(0), "(is-func (list 12 34))");
+            assert_atom(RAtom::Int(1), "(is-func if)");
+        }
+    }
+
+    #[cfg(test)]
+    mod compare {
+        use super::*;
+
+        #[test]
+        fn eq_ne() {
+            assert_atom(RAtom::Int(1), "(= 1 1)");
+            assert_atom(RAtom::Int(0), "(= 1 2)");
+            assert_atom(RAtom::Int(1), "(= 2 2)");
+
+            assert_atom(RAtom::Int(1), "(= (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(0), "(= (list 1 2 4) (list 1 2 3))");
+            assert_atom(RAtom::Int(0), "(= (list 1 2 3 4) (list 1 2 3))");
+            assert_atom(RAtom::Int(1), "(= () (list))");
+
+            assert_atom(RAtom::Int(1), "(= println println)");
+            assert_atom(RAtom::Int(0), "(= if println)");
+
+            assert_atom(RAtom::Int(1), "(def f (func ())) (= f f)");
+            assert_atom(RAtom::Int(0), "(def f (func ())) (= f (func ()))");
+
+            assert_atom(RAtom::Int(0), "(!= 1 1)");
+            assert_atom(RAtom::Int(1), "(!= 1 2)");
+            assert_atom(RAtom::Int(0), "(!= if if)");
+            assert_atom(RAtom::Int(1), "(!= if println)");
+        }
+
+        #[test]
+        fn lt() {
+            assert_atom(RAtom::Int(1), "(< 1 2)");
+            assert_atom(RAtom::Int(0), "(< 2 2)");
+            assert_atom(RAtom::Int(0), "(< 3 2)");
+
+            assert_atom(RAtom::Int(1), "(< 1 2 3)");
+            assert_atom(RAtom::Int(0), "(< 1 2 2)");
+            assert_atom(RAtom::Int(0), "(< 1 2 1)");
+
+            assert_atom(RAtom::Int(1), "(< (list 1 2 3) (list 2 2 3))");
+            assert_atom(RAtom::Int(0), "(< (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(0), "(< (list 1 2 3) (list 0 2 3))");
+
+            assert_atom(RAtom::Int(1), "(< (list 1 2 3) (list 1 2 3 4))");
+            assert_atom(RAtom::Int(0), "(< (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(0), "(< (list 1 2 3 4) (list 1 2 3))");
+        }
+
+        #[test]
+        fn le() {
+            assert_atom(RAtom::Int(1), "(<= 1 2)");
+            assert_atom(RAtom::Int(1), "(<= 2 2)");
+            assert_atom(RAtom::Int(0), "(<= 3 2)");
+
+            assert_atom(RAtom::Int(1), "(<= 1 2 3)");
+            assert_atom(RAtom::Int(1), "(<= 1 2 2)");
+            assert_atom(RAtom::Int(0), "(<= 1 2 1)");
+
+            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 2 2 3))");
+            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(0), "(<= (list 1 2 3) (list 0 2 3))");
+
+            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 1 2 3 4))");
+            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(0), "(<= (list 1 2 3 4) (list 1 2 3))");
+        }
+
+        #[test]
+        fn gt() {
+            assert_atom(RAtom::Int(0), "(> 1 2)");
+            assert_atom(RAtom::Int(0), "(> 2 2)");
+            assert_atom(RAtom::Int(1), "(> 3 2)");
+
+            assert_atom(RAtom::Int(0), "(> 3 2 3)");
+            assert_atom(RAtom::Int(0), "(> 3 2 2)");
+            assert_atom(RAtom::Int(1), "(> 3 2 1)");
+
+            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 2 2 3))");
+            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(1), "(> (list 1 2 3) (list 0 2 3))");
+
+            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 1 2 3 4))");
+            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(1), "(> (list 1 2 3 4) (list 1 2 3))");
+        }
+
+        #[test]
+        fn ge() {
+            assert_atom(RAtom::Int(0), "(>= 1 2)");
+            assert_atom(RAtom::Int(1), "(>= 2 2)");
+            assert_atom(RAtom::Int(1), "(>= 3 2)");
+
+            assert_atom(RAtom::Int(0), "(>= 3 2 3)");
+            assert_atom(RAtom::Int(1), "(>= 3 2 2)");
+            assert_atom(RAtom::Int(1), "(>= 3 2 1)");
+
+            assert_atom(RAtom::Int(0), "(>= (list 1 2 3) (list 2 2 3))");
+            assert_atom(RAtom::Int(1), "(>= (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(1), "(>= (list 1 2 3) (list 0 2 3))");
+
+            assert_atom(RAtom::Int(0), "(>= (list 1 2 3) (list 1 2 3 4))");
+            assert_atom(RAtom::Int(1), "(>= (list 1 2 3) (list 1 2 3))");
+            assert_atom(RAtom::Int(1), "(>= (list 1 2 3 4) (list 1 2 3))");
+        }
     }
 }

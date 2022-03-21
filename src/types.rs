@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::convert::From;
 use std::fmt;
 use std::ops::{Index, RangeFrom};
@@ -164,6 +165,17 @@ impl RList {
     pub fn iter(&self) -> std::slice::Iter<RType> {
         self.0.iter()
     }
+
+    pub fn cmp(&self, other: &RList) -> Result<Ordering, RError> {
+        for (x, y) in self.iter().zip(other.iter()) {
+            match x.cmp(y) {
+                Ok(Ordering::Equal) => {}
+                Ok(x) => return Ok(x),
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(self.len().cmp(&other.len()))
+    }
 }
 
 impl fmt::Display for RList {
@@ -326,6 +338,18 @@ impl RType {
         match self {
             RType::List(list) if list.0.len() == 0 => true,
             _ => false,
+        }
+    }
+
+    pub fn cmp(&self, other: &RType) -> Result<Ordering, RError> {
+        match (self, other) {
+            (RType::Atom(RAtom::Int(x)), RType::Atom(RAtom::Int(y))) => Ok(x.cmp(y)),
+            (RType::Atom(RAtom::String(x)), RType::Atom(RAtom::String(y))) => Ok(x.cmp(y)),
+            (RType::List(x), RType::List(y)) => x.cmp(y),
+            (_, _) => Err(RError::Type(format!(
+                "`{}` and `{}` are not comparable.",
+                self, other
+            ))),
         }
     }
 }

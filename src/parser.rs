@@ -187,7 +187,7 @@ impl Parser {
         Ok(())
     }
 
-    pub fn flush(&mut self) -> Result<(), RError> {
+    fn flush(&mut self) -> Result<(), RError> {
         if let AtomBuilder::Nil = self.builder {
             Ok(())
         } else {
@@ -228,30 +228,37 @@ impl Parser {
     pub fn pop(&mut self) -> Option<RType> {
         self.queue.pop_front()
     }
-}
 
-pub fn parse(text: &str) -> Result<RList, RError> {
-    let mut p = Parser::new();
+    pub fn close(&mut self) -> Result<usize, RError> {
+        if let Err(err) = self.flush() {
+            return Err(err);
+        }
 
-    if let Err(err) = p.feed(text) {
-        return Err(err);
+        if !self.is_completed() {
+            return Err(RError::Incompleted(self.builder.get_buf()));
+        }
+
+        Ok(self.stack.len())
     }
-
-    if let Err(err) = p.flush() {
-        return Err(err);
-    }
-
-    if !p.is_completed() {
-        return Err(RError::Incompleted(p.builder.get_buf()));
-    }
-
-    Ok(RList::new(p.queue.into()))
 }
 
 #[cfg(test)]
-mod test {
-    use super::parse;
-    use crate::types::{RAtom, RError, RType};
+pub mod test {
+    use super::*;
+
+    pub fn parse(text: &str) -> Result<RList, RError> {
+        let mut p = Parser::new();
+
+        if let Err(err) = p.feed(text) {
+            return Err(err);
+        }
+
+        if let Err(err) = p.close() {
+            return Err(err);
+        }
+
+        Ok(RList::new(p.queue.into()))
+    }
 
     fn assert_atom(expect: RAtom, code: &str) {
         match parse(code) {
