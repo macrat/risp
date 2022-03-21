@@ -7,18 +7,26 @@ mod parser;
 mod scope;
 mod types;
 
-fn compute(scope: &Rc<RefCell<scope::Scope>>, parser: &mut parser::Parser) {
+fn compute(scope: &Rc<RefCell<scope::Scope>>, parser: &mut parser::Parser, show_prompt: bool) {
     loop {
         match parser.pop() {
             Some(expr) => match expr.compute(Rc::clone(scope)) {
-                Ok(result) if result.is_nil() => println!(""),
-                Ok(result) => println!("> {}\n", result),
+                Ok(result) if !result.is_nil() && show_prompt => println!("< {}", result),
+                Ok(_) => {}
                 Err(err) => {
+                    if !show_prompt {
+                        println!("> {}", expr);
+                    }
                     println!("! {}\n", err);
                     std::process::exit(1);
                 }
             },
-            None => break,
+            None => {
+                if show_prompt && parser.is_completed() {
+                    println!();
+                }
+                break;
+            }
         }
     }
 }
@@ -30,22 +38,28 @@ fn main() {
         std::process::exit(-1);
     }
 
+    let show_prompt = atty::is(atty::Stream::Stdin);
+
     let mut parser = parser::Parser::new();
 
     let stdin = std::io::stdin();
     let mut input = String::new();
     loop {
-        if parser.is_completed() {
-            print!("< ");
-        } else {
-            print!("| ");
+        if show_prompt {
+            if parser.is_completed() {
+                print!("> ");
+            } else {
+                print!("| ");
+            }
         }
         let _ = std::io::stdout().flush();
 
         input.clear();
         match stdin.read_line(&mut input) {
             Ok(0) => {
-                println!("");
+                if show_prompt {
+                    println!("");
+                }
                 break;
             }
             Ok(_) => {
@@ -54,7 +68,7 @@ fn main() {
                     std::process::exit(1);
                 }
 
-                compute(&scope, &mut parser);
+                compute(&scope, &mut parser, show_prompt);
             }
             Err(err) => {
                 println!("! {}", err);
@@ -68,5 +82,5 @@ fn main() {
         std::process::exit(1);
     }
 
-    compute(&scope, &mut parser);
+    compute(&scope, &mut parser, show_prompt);
 }

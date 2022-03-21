@@ -7,11 +7,16 @@ Just a learning project.
 
 ## example
 
-``` lisp
+```
+$ cat hello-world.lisp
 (println "hello world!")
+
+$ cargo run <./hello-world.lisp
+hello world!
 ```
 
-``` lisp
+```
+$ cat factorial.lisp
 (def factorial (func (x)
   (def loop (func (x n)
     (if (> n 1)
@@ -20,6 +25,19 @@ Just a learning project.
   (loop x (- x 1))))
 
 (println "5! =" (factorial 5))
+
+$ cargo run <./factorial.lisp
+5! = 120
+```
+
+```
+$ cargo run
+> (+ 1
+|    2)
+< 3
+
+> (println (+ 1 2))
+3
 ```
 
 ## functions
