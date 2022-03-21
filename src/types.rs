@@ -70,6 +70,14 @@ impl RAtom {
             _ => Ok(RType::Atom(self.clone())),
         }
     }
+
+    pub fn as_bool(&self) -> bool {
+        match self {
+            RAtom::Symbol(_) => true,
+            RAtom::Int(i) => *i != 0,
+            RAtom::String(s) => s.len() != 0,
+        }
+    }
 }
 
 impl fmt::Display for RAtom {
@@ -78,16 +86,6 @@ impl fmt::Display for RAtom {
             RAtom::Symbol(name) => write!(f, "{}", name),
             RAtom::Int(value) => write!(f, "{}", value),
             RAtom::String(value) => write!(f, "{}", value),
-        }
-    }
-}
-
-impl From<RAtom> for bool {
-    fn from(item: RAtom) -> bool {
-        match item {
-            RAtom::Symbol(_) => true,
-            RAtom::Int(i) => i != 0,
-            RAtom::String(s) => s.len() != 0,
         }
     }
 }
@@ -176,6 +174,10 @@ impl RList {
         }
         Ok(self.len().cmp(&other.len()))
     }
+
+    pub fn as_bool(&self) -> bool {
+        self.len() != 0
+    }
 }
 
 impl fmt::Display for RList {
@@ -191,12 +193,6 @@ impl Clone for RList {
             result.push((*x).clone());
         }
         result
-    }
-}
-
-impl From<RList> for bool {
-    fn from(item: RList) -> bool {
-        item.len() != 0
     }
 }
 
@@ -357,6 +353,14 @@ impl RType {
             ))),
         }
     }
+
+    pub fn as_bool(&self) -> bool {
+        match self {
+            RType::Atom(atom) => atom.as_bool(),
+            RType::List(list) => list.as_bool(),
+            RType::Func(_) => true,
+        }
+    }
 }
 
 impl fmt::Display for RType {
@@ -375,16 +379,6 @@ impl Clone for RType {
             RType::Atom(atom) => RType::Atom(atom.clone()),
             RType::List(list) => RType::List(list.clone()),
             RType::Func(func) => RType::Func(Rc::clone(func)),
-        }
-    }
-}
-
-impl From<RType> for bool {
-    fn from(item: RType) -> bool {
-        match item {
-            RType::Atom(atom) => atom.into(),
-            RType::List(list) => list.into(),
-            RType::Func(_) => true,
         }
     }
 }

@@ -146,7 +146,7 @@ impl Callable for If {
         }
 
         let cond = match args[0].compute(Rc::clone(&scope)) {
-            Ok(val) => val.into(),
+            Ok(val) => val.as_bool(),
             Err(err) => return Err(err),
         };
 
@@ -174,6 +174,152 @@ impl Callable for Do {
 }
 
 #[derive(Debug)]
+struct While;
+
+impl Callable for While {
+    fn name(&self) -> &str {
+        "while"
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        if args.len() == 0 {
+            return Err(RError::Argument(format!(
+                "`while` needs 1 or more arguments but got {}.",
+                args
+            )));
+        }
+
+        let scope = Scope::new(Some(scope));
+        let mut result = RType::nil();
+
+        loop {
+            let cond = match args[0].compute(Rc::clone(&scope)) {
+                Ok(val) => val,
+                Err(err) => return Err(err),
+            };
+            if !cond.as_bool() {
+                break;
+            }
+
+            result = match RList::from(&args[1..]).compute_last(Rc::clone(&scope)) {
+                Ok(val) => val,
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+#[derive(Debug)]
+struct Map;
+
+impl Callable for Map {
+    fn name(&self) -> &str {
+        "map"
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        if args.len() != 2 {
+            return Err(RError::Argument(format!(
+                "`map` needs exact 2 arguments but got {}.",
+                args
+            )));
+        }
+
+        let list = match args[0].compute(Rc::clone(&scope)) {
+            Ok(RType::List(xs)) => xs,
+            Ok(x) => {
+                return Err(RError::Type(format!(
+                    "the first argument of `map` must be a list, but got `{}`.",
+                    x
+                )))
+            }
+            Err(err) => return Err(err),
+        };
+
+        let func = match args[1].compute(Rc::clone(&scope)) {
+            Ok(RType::Func(f)) => f,
+            Ok(x) => {
+                return Err(RError::Type(format!(
+                    "the second argument of `map` must be a function, but got `{}`.",
+                    x
+                )))
+            }
+            Err(err) => return Err(err),
+        };
+
+        let mut result = RList::empty();
+
+        for x in list.iter() {
+            match func.call(RList::new(vec![x.clone()]), Rc::clone(&scope)) {
+                Ok(x) => result.push(x),
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(RType::List(result))
+    }
+}
+
+#[derive(Debug)]
+struct Fold;
+
+impl Callable for Fold {
+    fn name(&self) -> &str {
+        "fold"
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        if args.len() != 2 {
+            return Err(RError::Argument(format!(
+                "`fold` needs exact 2 arguments but got {}.",
+                args
+            )));
+        }
+
+        let list = match args[0].compute(Rc::clone(&scope)) {
+            Ok(RType::List(xs)) if xs.len() >= 2 => xs,
+            Ok(RType::List(xs)) => {
+                return Err(RError::Type(format!(
+                    "the first argument of `fold` must be longer than 2, but got `{}`.",
+                    xs
+                )))
+            }
+            Ok(x) => {
+                return Err(RError::Type(format!(
+                    "the first argument of `fold` must be a list, but got `{}`.",
+                    x
+                )))
+            }
+            Err(err) => return Err(err),
+        };
+
+        let func = match args[1].compute(Rc::clone(&scope)) {
+            Ok(RType::Func(f)) => f,
+            Ok(x) => {
+                return Err(RError::Type(format!(
+                    "the second argument of `fold` must be a function, but got `{}`.",
+                    x
+                )))
+            }
+            Err(err) => return Err(err),
+        };
+
+        let mut result = list[0].clone();
+
+        for x in &list[1..] {
+            match func.call(RList::new(vec![result, x.clone()]), Rc::clone(&scope)) {
+                Ok(x) => result = x,
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+#[derive(Debug)]
 struct List;
 
 impl Callable for List {
@@ -186,6 +332,69 @@ impl Callable for List {
             Ok(list) => Ok(RType::List(list)),
             Err(err) => Err(err),
         }
+    }
+}
+
+#[derive(Debug)]
+struct Seq;
+
+impl Callable for Seq {
+    fn name(&self) -> &str {
+        "seq"
+    }
+
+    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+        if args.len() != 1 && args.len() != 2 {
+            return Err(RError::Argument(format!(
+                "`seq` needs 1 or 2 int argument but got {}",
+                args
+            )));
+        }
+
+        let args = match args.compute_each(scope) {
+            Ok(xs) => xs,
+            Err(err) => return Err(err),
+        };
+
+        let to = match &args[args.len() - 1] {
+            RType::Atom(RAtom::Int(n)) => *n,
+            x => {
+                return Err(RError::Argument(format!(
+                    "`seq` needs 1 or 2 int argument but got `{}`",
+                    x
+                )))
+            }
+        };
+        if args.len() == 1 && to == 0 {
+            return Ok(RType::nil());
+        }
+
+        let from = if args.len() == 2 {
+            match &args[0] {
+                RType::Atom(RAtom::Int(n)) => *n,
+                x => {
+                    return Err(RError::Argument(format!(
+                        "`seq` needs 1 or 2 int argument but got `{}`",
+                        x
+                    )))
+                }
+            }
+        } else if to > 0 {
+            1
+        } else {
+            -1
+        };
+
+        let step = if from < to { 1 } else { -1 };
+
+        let mut result = RList::empty();
+        let mut i = from;
+        while i != to {
+            result.push(RType::Atom(RAtom::Int(i)));
+            i += step;
+        }
+        result.push(RType::Atom(RAtom::Int(i)));
+        Ok(RType::List(result))
     }
 }
 
@@ -369,12 +578,16 @@ pub fn register_to(scope: &mut Scope) -> Result<(), RError> {
     register!(scope, "list", binary_func!(List));
     register!(scope, "car", binary_func!(Car));
     register!(scope, "cdr", binary_func!(Cdr));
+    register!(scope, "seq", binary_func!(Seq));
 
     register!(scope, "print", binary_func!(Print("println", "")));
     register!(scope, "println", binary_func!(Print("println", "\n")));
 
     register!(scope, "if", binary_func!(If));
     register!(scope, "do", binary_func!(Do));
+    register!(scope, "while", binary_func!(While));
+    register!(scope, "map", binary_func!(Map));
+    register!(scope, "fold", binary_func!(Fold));
 
     register!(
         scope,
@@ -695,12 +908,47 @@ mod test {
             RAtom::Int(120),
             r"
                 (def f (func (x)
-                  (def loop (func (n)
+                  (def l (func (n)
                     (if (> n 1) (do
                       (set x (* x n))
-                      (loop (- n 1))))
+                      (l (- n 1))))
                       x))
-                  (loop (- x 1))))
+                  (l (- x 1))))
+                (f 5)
+            ",
+        );
+
+        assert_atom(
+            RAtom::Int(120),
+            r"
+                (def f (func (x)
+                  (def n x)
+                  (while (> n 1)
+                    (set n (- n 1))
+                    (set x (* x n)))))
+
+                (f 5)
+            ",
+        );
+
+        assert_atom(
+            RAtom::Int(120),
+            r"
+                (def f (func (x)
+                  (map (seq (- x 1))
+                    (func (n) (set x (* x n))))
+                  x))
+
+                (f 5)
+            ",
+        );
+
+        assert_atom(
+            RAtom::Int(120),
+            r"
+                (def f (func (x)
+                  (fold (seq x) *)))
+
                 (f 5)
             ",
         );
@@ -723,6 +971,30 @@ mod test {
                 (= xs (list 1 2 3))
             "#,
         );
+    }
+
+    #[test]
+    fn seq() {
+        assert_atom(
+            RAtom::Int(1),
+            "(println (seq 5)) (= (seq 5) (list 1 2 3 4 5))",
+        );
+        assert_atom(
+            RAtom::Int(1),
+            "(println (seq (- 3))) (= (seq (- 3)) (list (- 1) (- 2) (- 3)))",
+        );
+        assert_atom(RAtom::Int(1), "(println (seq 0)) (= (seq 0) ())");
+
+        assert_atom(
+            RAtom::Int(1),
+            "(println (seq 5 8)) (= (seq 5 8) (list 5 6 7 8))",
+        );
+        assert_atom(
+            RAtom::Int(1),
+            "(println (seq 8 5)) (= (seq 8 5) (list 8 7 6 5))",
+        );
+        assert_atom(RAtom::Int(1), "(println (seq 5 5)) (= (seq 5 5) (list 5))");
+        assert_atom(RAtom::Int(1), "(println (seq 0 0)) (= (seq 0 0) (list 0))");
     }
 
     #[test]
@@ -780,6 +1052,31 @@ mod test {
                   (set result 2))
                 result
             ",
+        );
+    }
+
+    #[test]
+    fn map() {
+        assert_atom(
+            RAtom::Int(1),
+            r"
+                (def f (func (x) (* x 2)))
+
+                (def xs (map (seq 5) f))
+
+                (println xs)
+                (= xs (list 2 4 6 8 10))
+            ",
+        );
+    }
+
+    #[test]
+    fn fold() {
+        assert_atom(RAtom::Int(15), "(fold (seq 5) +)");
+        assert_atom(RAtom::Int(120), "(fold (seq 5) *)");
+        assert_atom(
+            RAtom::String("hello".into()),
+            r#"(fold (list "he" "l" "lo") +)"#,
         );
     }
 
