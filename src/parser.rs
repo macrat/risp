@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use crate::trace::Position;
 use crate::types::{RAtom, RError, RList, RType};
 
 #[derive(Debug)]
@@ -134,14 +135,20 @@ impl AtomBuilder {
 
 #[derive(Debug)]
 pub struct Parser {
+    position: Position,
     builder: AtomBuilder,
     stack: Vec<RList>,
     queue: VecDeque<RType>,
 }
 
 impl Parser {
-    pub fn new() -> Parser {
+    pub fn new(file_name: String) -> Parser {
         Parser {
+            position: Position {
+                file: file_name,
+                line: 1,
+                col: 0,
+            },
             builder: AtomBuilder::Nil,
             stack: Vec::new(),
             queue: VecDeque::new(),
@@ -150,12 +157,19 @@ impl Parser {
 
     pub fn feed(&mut self, text: &str) -> Result<(), RError> {
         for c in text.chars() {
+            if c == '\n' {
+                self.position.line += 1;
+                self.position.col = 0;
+            } else {
+                self.position.col += 1;
+            }
+
             match c {
                 '(' if !self.builder.is_string() => {
                     if let Err(err) = self.flush() {
                         return Err(err);
                     }
-                    self.stack.push(RList::empty());
+                    self.stack.push(RList::empty(Some(self.position.clone())));
                 }
                 ')' if !self.builder.is_string() => {
                     if let Err(err) = self.flush() {
@@ -240,6 +254,10 @@ impl Parser {
 
         Ok(self.stack.len())
     }
+
+    pub fn reset(&mut self) {
+        *self = Parser::new(self.position.file.clone());
+    }
 }
 
 #[cfg(test)]
@@ -247,7 +265,7 @@ pub mod test {
     use super::*;
 
     pub fn parse(text: &str) -> Result<RList, RError> {
-        let mut p = Parser::new();
+        let mut p = Parser::new("<test>".into());
 
         if let Err(err) = p.feed(text) {
             return Err(err);
@@ -257,7 +275,7 @@ pub mod test {
             return Err(err);
         }
 
-        Ok(RList::new(p.queue.into()))
+        Ok(RList::new(p.queue.into(), None))
     }
 
     fn assert_atom(expect: RAtom, code: &str) {

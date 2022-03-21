@@ -5,20 +5,22 @@ use std::rc::Rc;
 mod funcs;
 mod parser;
 mod scope;
+mod trace;
 mod types;
 
 fn compute(scope: &Rc<RefCell<scope::Scope>>, parser: &mut parser::Parser, show_prompt: bool) {
     loop {
+        let mut trace = trace::Trace::new();
         match parser.pop() {
-            Some(expr) => match expr.compute(Rc::clone(scope)) {
+            Some(expr) => match expr.compute(Rc::clone(scope), &mut trace) {
                 Ok(result) if !result.is_nil() && show_prompt => println!("< {}", result),
                 Ok(_) => {}
                 Err(err) if show_prompt => {
-                    println!("! {}", err);
+                    trace.print(err);
                 }
                 Err(err) => {
                     println!("> {}", expr);
-                    println!("! {}", err);
+                    trace.print(err);
                     std::process::exit(1);
                 }
             },
@@ -41,7 +43,7 @@ fn main() {
 
     let show_prompt = atty::is(atty::Stream::Stdin);
 
-    let mut parser = parser::Parser::new();
+    let mut parser = parser::Parser::new("<stdin>".into());
 
     let stdin = std::io::stdin();
     let mut input = String::new();
@@ -67,7 +69,7 @@ fn main() {
                 if let Err(err) = parser.feed(input.as_str()) {
                     println!("! {}", err);
                     if show_prompt {
-                        parser = parser::Parser::new();
+                        parser.reset();
                     } else {
                         std::process::exit(1);
                     }

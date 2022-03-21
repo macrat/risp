@@ -6,6 +6,7 @@ use std::ops::{Index, RangeFrom};
 use std::rc::Rc;
 
 use crate::scope::Scope;
+use crate::trace::{Position, Trace};
 
 #[derive(Debug, PartialEq)]
 pub enum RError {
@@ -61,7 +62,7 @@ pub enum RAtom {
 }
 
 impl RAtom {
-    fn compute(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+    fn compute(&self, scope: Rc<RefCell<Scope>>, _: &mut Trace) -> Result<RType, RError> {
         match self {
             RAtom::Symbol(name) => match scope.borrow().get(name) {
                 Some(val) => Ok((*val).clone()),
@@ -91,43 +92,56 @@ impl fmt::Display for RAtom {
 }
 
 #[derive(Debug)]
-pub struct RList(Vec<RType>);
+pub struct RList(Vec<RType>, Option<Position>);
 
 impl RList {
-    pub fn new(items: Vec<RType>) -> RList {
-        RList(items)
+    pub fn new(items: Vec<RType>, pos: Option<Position>) -> RList {
+        RList(items, pos)
     }
 
-    pub fn from(items: &[RType]) -> RList {
-        RList::new(items.to_vec())
+    pub fn from(items: &[RType], pos: Option<Position>) -> RList {
+        RList::new(items.to_vec(), pos)
     }
 
-    pub fn empty() -> RList {
-        RList::new(Vec::new())
+    pub fn empty(pos: Option<Position>) -> RList {
+        RList::new(Vec::new(), pos)
     }
 
     pub fn push(&mut self, val: RType) {
         self.0.push(val)
     }
 
-    pub fn compute(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+    pub fn compute(&self, scope: Rc<RefCell<Scope>>, trace: &mut Trace) -> Result<RType, RError> {
         if self.0.len() == 0 {
             return Ok(RType::nil());
         }
 
-        match self.0[0].compute(Rc::clone(&scope)) {
+        trace.push(self.clone());
+        match self.0[0].compute(Rc::clone(&scope), trace) {
             Ok(first) => match &first {
-                RType::Func(func) => func.call(RList(self.0[1..].to_vec()), scope),
+                RType::Func(func) => {
+                    match func.call(RList::from(&self.0[1..], None), scope, trace) {
+                        Ok(x) => {
+                            trace.pop();
+                            Ok(x)
+                        }
+                        Err(err) => Err(err),
+                    }
+                }
                 _ => Err(RError::Type(format!("`{}` is not a function.", first))),
             },
             Err(err) => Err(err),
         }
     }
 
-    pub fn compute_last(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+    pub fn compute_last(
+        &self,
+        scope: Rc<RefCell<Scope>>,
+        trace: &mut Trace,
+    ) -> Result<RType, RError> {
         let mut result = RType::nil();
         for x in &self.0 {
-            match x.compute(Rc::clone(&scope)) {
+            match x.compute(Rc::clone(&scope), trace) {
                 Ok(x) => {
                     result = x;
                 }
@@ -137,10 +151,14 @@ impl RList {
         Ok(result)
     }
 
-    pub fn compute_each(&self, scope: Rc<RefCell<Scope>>) -> Result<RList, RError> {
-        let mut result = RList::empty();
+    pub fn compute_each(
+        &self,
+        scope: Rc<RefCell<Scope>>,
+        trace: &mut Trace,
+    ) -> Result<RList, RError> {
+        let mut result = RList::empty(None);
         for x in &self.0 {
-            match x.compute(Rc::clone(&scope)) {
+            match x.compute(Rc::clone(&scope), trace) {
                 Ok(x) => result.push(x),
                 Err(err) => return Err(err),
             }
@@ -178,6 +196,13 @@ impl RList {
     pub fn as_bool(&self) -> bool {
         self.len() != 0
     }
+
+    pub fn position(&self) -> Option<Position> {
+        match &self.1 {
+            Some(x) => Some(x.clone()),
+            None => None,
+        }
+    }
 }
 
 impl fmt::Display for RList {
@@ -188,7 +213,7 @@ impl fmt::Display for RList {
 
 impl Clone for RList {
     fn clone(&self) -> RList {
-        let mut result = RList::empty();
+        let mut result = RList::empty(self.1.clone());
         for x in &self.0 {
             result.push((*x).clone());
         }
@@ -231,7 +256,12 @@ impl Index<RangeFrom<usize>> for RList {
 pub trait Callable {
     fn name(&self) -> &str;
 
-    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError>;
+    fn call(
+        &self,
+        args: RList,
+        scope: Rc<RefCell<Scope>>,
+        trace: &mut Trace,
+    ) -> Result<RType, RError>;
 }
 
 impl fmt::Display for dyn Callable {
@@ -264,7 +294,12 @@ impl Callable for RFunc {
         }
     }
 
-    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+    fn call(
+        &self,
+        args: RList,
+        scope: Rc<RefCell<Scope>>,
+        trace: &mut Trace,
+    ) -> Result<RType, RError> {
         match self {
             RFunc::Pure {
                 args: arg_names,
@@ -281,7 +316,7 @@ impl Callable for RFunc {
                 }
 
                 for (name, value) in arg_names.iter().zip(args.0) {
-                    match value.compute(Rc::clone(&scope)) {
+                    match value.compute(Rc::clone(&scope), trace) {
                         Ok(value) => {
                             if let Err(err) = (*local)
                                 .borrow_mut()
@@ -294,12 +329,12 @@ impl Callable for RFunc {
                     }
                 }
 
-                match body.compute_last(local) {
+                match body.compute_last(local, trace) {
                     Ok(result) => Ok(result),
                     Err(err) => Err(err),
                 }
             }
-            RFunc::Binary(c) => c.call(args, scope),
+            RFunc::Binary(c) => c.call(args, scope, trace),
         }
     }
 }
@@ -324,13 +359,13 @@ pub enum RType {
 
 impl RType {
     pub fn nil() -> RType {
-        RType::List(RList::empty())
+        RType::List(RList::empty(None))
     }
 
-    pub fn compute(&self, scope: Rc<RefCell<Scope>>) -> Result<RType, RError> {
+    pub fn compute(&self, scope: Rc<RefCell<Scope>>, trace: &mut Trace) -> Result<RType, RError> {
         match self {
-            RType::Atom(atom) => atom.compute(scope),
-            RType::List(list) => list.compute(scope),
+            RType::Atom(atom) => atom.compute(scope, trace),
+            RType::List(list) => list.compute(scope, trace),
             RType::Func(func) => Ok(RType::Func(Rc::clone(func))),
         }
     }
