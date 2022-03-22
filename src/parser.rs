@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::trace::Position;
+use crate::context::trace::Position;
 use crate::types::{RAtom, RError, RList, RType};
 
 #[derive(Debug)]

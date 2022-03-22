@@ -1,10 +1,8 @@
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::scope::Scope;
-use crate::trace::Trace;
+use crate::context::{self, Context};
 use crate::types::*;
 
 #[derive(Debug)]
@@ -15,7 +13,7 @@ impl Callable for Func {
         "func"
     }
 
-    fn call(&self, args: RList, scope: Rc<RefCell<Scope>>, _: &mut Trace) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         Ok(RType::Func(Rc::new(RFunc::Pure {
             args: match &args[0] {
                 RType::List(list) => {
@@ -38,7 +36,7 @@ impl Callable for Func {
                 }
             },
             body: RList::from(&args[1..], None),
-            capture: Rc::clone(&scope),
+            capture: ctx.scope(),
         })))
     }
 }
@@ -57,22 +55,14 @@ impl Callable for Def {
         "def"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
-        let value = match args[1].compute(Rc::clone(&scope), trace) {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        let value = match args[1].compute(ctx) {
             Ok(x) => x,
             Err(err) => return Err(err),
         };
 
         if let RType::Atom(RAtom::Symbol(name)) = &args[0] {
-            if let Err(err) = (*scope)
-                .borrow_mut()
-                .define(String::from(name), Rc::new(value.clone()))
-            {
+            if let Err(err) = ctx.define_value(String::from(name), Rc::new(value.clone())) {
                 Err(err)
             } else {
                 Ok(value)
@@ -93,22 +83,14 @@ impl Callable for Set {
         "set"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
-        let value = match args[1].compute(Rc::clone(&scope), trace) {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        let value = match args[1].compute(ctx) {
             Ok(x) => x,
             Err(err) => return Err(err),
         };
 
         if let RType::Atom(RAtom::Symbol(name)) = &args[0] {
-            if let Err(err) = (*scope)
-                .borrow_mut()
-                .set(String::from(name), Rc::new(value.clone()))
-            {
+            if let Err(err) = ctx.set_value(String::from(name), Rc::new(value.clone())) {
                 Err(err)
             } else {
                 Ok(value)
@@ -122,6 +104,37 @@ impl Callable for Set {
 }
 
 #[derive(Debug)]
+struct Import;
+
+impl Callable for Import {
+    fn name(&self) -> &str {
+        "import"
+    }
+
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        if args.len() != 1 {
+            return Err(RError::Argument(format!(
+                "`import` needs exact 1 arguments but got `{}`.",
+                args
+            )));
+        }
+
+        let name = match args[0].compute(ctx) {
+            Ok(RType::Atom(RAtom::String(x))) => x,
+            Ok(x) => {
+                return Err(RError::Type(format!(
+                    "`import` needs a string as argument but got `{}`.",
+                    x
+                )))
+            }
+            Err(err) => return Err(err),
+        };
+
+        ctx.load(name)
+    }
+}
+
+#[derive(Debug)]
 struct Print<'a>(&'a str, &'a str);
 
 impl Callable for Print<'_> {
@@ -129,13 +142,8 @@ impl Callable for Print<'_> {
         self.0
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
-        match args.compute_each(scope, trace) {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        match args.compute_each(ctx) {
             Ok(x) => {
                 print!("{}{}", x.to_bare_string(), self.1);
                 Ok(RType::nil())
@@ -153,12 +161,7 @@ impl Callable for If {
         "if"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 2 && args.len() != 3 {
             return Err(RError::Argument(format!(
                 "`if` requires 2 or 3 arguments but got {} arguments.",
@@ -166,15 +169,15 @@ impl Callable for If {
             )));
         }
 
-        let cond = match args[0].compute(Rc::clone(&scope), trace) {
+        let cond = match args[0].compute(ctx) {
             Ok(val) => val.as_bool(),
             Err(err) => return Err(err),
         };
 
         if cond {
-            args[1].compute(Scope::new(Some(scope)), trace)
+            args[1].compute(ctx)
         } else if args.len() == 3 {
-            args[2].compute(Scope::new(Some(scope)), trace)
+            args[2].compute(ctx)
         } else {
             Ok(RType::nil())
         }
@@ -189,13 +192,8 @@ impl Callable for Do {
         "do"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
-        args.compute_last(Scope::new(Some(scope)), trace)
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        args.compute_last(ctx)
     }
 }
 
@@ -207,12 +205,7 @@ impl Callable for While {
         "while"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() == 0 {
             return Err(RError::Argument(format!(
                 "`while` needs 1 or more arguments but got {}.",
@@ -220,11 +213,11 @@ impl Callable for While {
             )));
         }
 
-        let scope = Scope::new(Some(scope));
+        let mut local = ctx.child();
         let mut result = RType::nil();
 
         loop {
-            let cond = match args[0].compute(Rc::clone(&scope), trace) {
+            let cond = match args[0].compute(ctx) {
                 Ok(val) => val,
                 Err(err) => return Err(err),
             };
@@ -232,7 +225,7 @@ impl Callable for While {
                 break;
             }
 
-            result = match RList::from(&args[1..], None).compute_last(Rc::clone(&scope), trace) {
+            result = match RList::from(&args[1..], None).compute_last(&mut local) {
                 Ok(val) => val,
                 Err(err) => return Err(err),
             }
@@ -250,12 +243,7 @@ impl Callable for Map {
         "map"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`map` needs exact 2 arguments but got {}.",
@@ -263,7 +251,7 @@ impl Callable for Map {
             )));
         }
 
-        let list = match args[0].compute(Rc::clone(&scope), trace) {
+        let list = match args[0].compute(ctx) {
             Ok(RType::List(xs)) => xs,
             Ok(x) => {
                 return Err(RError::Type(format!(
@@ -274,7 +262,7 @@ impl Callable for Map {
             Err(err) => return Err(err),
         };
 
-        let func = match args[1].compute(Rc::clone(&scope), trace) {
+        let func = match args[1].compute(ctx) {
             Ok(RType::Func(f)) => f,
             Ok(x) => {
                 return Err(RError::Type(format!(
@@ -288,7 +276,7 @@ impl Callable for Map {
         let mut result = RList::empty(None);
 
         for x in list.iter() {
-            match func.call(RList::new(vec![x.clone()], None), Rc::clone(&scope), trace) {
+            match func.call(ctx, RList::new(vec![x.clone()], None)) {
                 Ok(x) => result.push(x),
                 Err(err) => return Err(err),
             }
@@ -306,12 +294,7 @@ impl Callable for Fold {
         "fold"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`fold` needs exact 2 arguments but got {}.",
@@ -319,7 +302,7 @@ impl Callable for Fold {
             )));
         }
 
-        let list = match args[0].compute(Rc::clone(&scope), trace) {
+        let list = match args[0].compute(ctx) {
             Ok(RType::List(xs)) if xs.len() >= 2 => xs,
             Ok(RType::List(xs)) => {
                 return Err(RError::Type(format!(
@@ -336,7 +319,7 @@ impl Callable for Fold {
             Err(err) => return Err(err),
         };
 
-        let func = match args[1].compute(Rc::clone(&scope), trace) {
+        let func = match args[1].compute(ctx) {
             Ok(RType::Func(f)) => f,
             Ok(x) => {
                 return Err(RError::Type(format!(
@@ -350,11 +333,7 @@ impl Callable for Fold {
         let mut result = list[0].clone();
 
         for x in &list[1..] {
-            match func.call(
-                RList::new(vec![result, x.clone()], None),
-                Rc::clone(&scope),
-                trace,
-            ) {
+            match func.call(ctx, RList::new(vec![result, x.clone()], None)) {
                 Ok(x) => result = x,
                 Err(err) => return Err(err),
             }
@@ -372,13 +351,8 @@ impl Callable for List {
         "list"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
-        match args.compute_each(scope, trace) {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        match args.compute_each(ctx) {
             Ok(list) => Ok(RType::List(list)),
             Err(err) => Err(err),
         }
@@ -393,12 +367,7 @@ impl Callable for Seq {
         "seq"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 1 && args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`seq` needs 1 or 2 int argument but got {}",
@@ -406,7 +375,7 @@ impl Callable for Seq {
             )));
         }
 
-        let args = match args.compute_each(scope, trace) {
+        let args = match args.compute_each(ctx) {
             Ok(xs) => xs,
             Err(err) => return Err(err),
         };
@@ -461,19 +430,14 @@ impl Callable for Car {
         "car"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 1 {
             Err(RError::Argument(format!(
                 "`car` needs exact 1 argument but got {} arguments",
                 args.len()
             )))
         } else {
-            match args[0].compute(scope, trace) {
+            match args[0].compute(ctx) {
                 Ok(RType::List(list)) => Ok(list[0].clone()),
                 Ok(RType::Atom(RAtom::String(x))) => match x.chars().next() {
                     Some(c) => Ok(RType::Atom(RAtom::String(c.into()))),
@@ -497,19 +461,14 @@ impl Callable for Cdr {
         "cdr"
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 1 {
             Err(RError::Argument(format!(
                 "`cdr` needs exact 1 argument but got {} arguments",
                 args.len()
             )))
         } else {
-            match args[0].compute(scope, trace) {
+            match args[0].compute(ctx) {
                 Ok(RType::List(list)) => Ok(RType::List(RList::from(&list[1..], None))),
                 Ok(RType::Atom(RAtom::String(x))) => {
                     let mut chars = x.chars();
@@ -534,15 +493,10 @@ impl Callable for CalculateOperator<'_> {
         self.0
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         let mut xs: Vec<RType> = Vec::new();
         for x in args.iter() {
-            match x.compute(Rc::clone(&scope), trace) {
+            match x.compute(ctx) {
                 Ok(x) => xs.push(x),
                 Err(err) => return Err(err),
             }
@@ -558,12 +512,7 @@ impl Callable for CompareOperator<'_> {
         self.0
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() < 2 {
             return Err(RError::Argument(format!(
                 "`{}` needs at least 2 values.",
@@ -571,13 +520,13 @@ impl Callable for CompareOperator<'_> {
             )));
         }
 
-        let mut x = match args[0].compute(Rc::clone(&scope), trace) {
+        let mut x = match args[0].compute(ctx) {
             Ok(x) => x,
             Err(err) => return Err(err),
         };
 
         for y in &args[1..] {
-            match y.compute(Rc::clone(&scope), trace) {
+            match y.compute(ctx) {
                 Ok(y) => {
                     match self.1(&x, &y) {
                         Ok(false) => return Ok(RType::Atom(RAtom::Int(0))),
@@ -616,14 +565,9 @@ impl Callable for TypeCheckOperator<'_> {
         self.0
     }
 
-    fn call(
-        &self,
-        args: RList,
-        scope: Rc<RefCell<Scope>>,
-        trace: &mut Trace,
-    ) -> Result<RType, RError> {
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         for x in args.iter() {
-            match x.compute(Rc::clone(&scope), trace) {
+            match x.compute(ctx) {
                 Ok(x) if self.1(&x) => {
                     return Ok(RType::Atom(RAtom::Int(1)));
                 }
@@ -649,9 +593,10 @@ macro_rules! register {
     };
 }
 
-pub fn register_to(scope: &mut Scope) -> Result<(), RError> {
+pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
     register!(scope, "def", binary_func!(Def));
     register!(scope, "set", binary_func!(Set));
+    register!(scope, "import", binary_func!(Import));
 
     register!(scope, "func", binary_func!(Func));
 
@@ -868,11 +813,11 @@ mod test {
     use crate::parser::test::parse;
 
     fn execute(code: &str) -> Result<RType, RError> {
-        let scope = Scope::new(None);
-        assert_eq!(Ok(()), register_to(&mut (*scope).borrow_mut()));
+        let mut ctx = Context::new(context::scope::Scope::new());
+        assert_eq!(Ok(()), register_to(&mut ctx.scope().borrow_mut()));
 
         return match parse(code) {
-            Ok(x) => x.compute_last(scope, &mut Trace::new()),
+            Ok(x) => x.compute_last(&mut ctx),
             Err(err) => Err(err),
         };
     }

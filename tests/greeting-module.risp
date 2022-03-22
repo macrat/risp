@@ -1,0 +1,12 @@
+" Greeting module "
+" This module is loaded by greeting.risp "
+" vim: set ft=lisp :"
+
+(def say-hello (func (name)
+  (println (+ "hello " name "!"))))
+
+" even you can load yourself in the module "
+(def say-hello-world (func ()
+  (((import "./tests/greeting-module.risp") say-hello) "world")))
+
+(println "module has loaded!")

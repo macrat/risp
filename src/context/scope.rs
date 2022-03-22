@@ -12,9 +12,16 @@ pub struct Scope {
 }
 
 impl Scope {
-    pub fn new(parent: Option<Rc<RefCell<Scope>>>) -> Rc<RefCell<Scope>> {
+    pub fn new() -> Rc<RefCell<Scope>> {
         Rc::new(RefCell::new(Scope {
-            parent,
+            parent: None,
+            values: HashMap::new(),
+        }))
+    }
+
+    pub fn child(parent: &Rc<RefCell<Scope>>) -> Rc<RefCell<Scope>> {
+        Rc::new(RefCell::new(Scope {
+            parent: Some(Rc::clone(parent)),
             values: HashMap::new(),
         }))
     }

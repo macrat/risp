@@ -1,0 +1,10 @@
+" Greeting "
+" This is loading greeting-module.risp "
+" vim: set ft=lisp :"
+
+(def greeting (import "./tests/greeting-module.risp"))
+
+(def hello-world (func ()
+  ((greeting say-hello) "world")))
+
+(hello-world)

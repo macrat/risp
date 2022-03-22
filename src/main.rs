@@ -1,26 +1,24 @@
-use std::cell::RefCell;
 use std::io::Write;
-use std::rc::Rc;
 
+mod context;
 mod funcs;
 mod parser;
-mod scope;
-mod trace;
 mod types;
 
-fn compute(scope: &Rc<RefCell<scope::Scope>>, parser: &mut parser::Parser, show_prompt: bool) {
+fn compute(ctx: &mut context::Context, parser: &mut parser::Parser, show_prompt: bool) {
     loop {
-        let mut trace = trace::Trace::new();
+        ctx.reset_trace();
+
         match parser.pop() {
-            Some(expr) => match expr.compute(Rc::clone(scope), &mut trace) {
+            Some(expr) => match expr.compute(ctx) {
                 Ok(result) if !result.is_nil() && show_prompt => println!("< {}", result),
                 Ok(_) => {}
                 Err(err) if show_prompt => {
-                    trace.print(err);
+                    ctx.trace().borrow().print(err);
                 }
                 Err(err) => {
                     println!("> {}", expr);
-                    trace.print(err);
+                    ctx.trace().borrow().print(err);
                     std::process::exit(1);
                 }
             },
@@ -35,11 +33,12 @@ fn compute(scope: &Rc<RefCell<scope::Scope>>, parser: &mut parser::Parser, show_
 }
 
 fn main() {
-    let scope = scope::Scope::new(None);
+    let scope = context::scope::Scope::new();
     if let Err(err) = funcs::register_to(&mut (*scope).borrow_mut()) {
         println!("failed to load embedded functions: {}", err);
         std::process::exit(-1);
     }
+    let mut ctx = context::Context::new(scope);
 
     let show_prompt = atty::is(atty::Stream::Stdin);
 
@@ -75,7 +74,7 @@ fn main() {
                     }
                 }
 
-                compute(&scope, &mut parser, show_prompt);
+                compute(&mut ctx, &mut parser, show_prompt);
             }
             Err(err) => {
                 println!("! {}", err);
@@ -89,5 +88,5 @@ fn main() {
         std::process::exit(1);
     }
 
-    compute(&scope, &mut parser, show_prompt);
+    compute(&mut ctx, &mut parser, show_prompt);
 }

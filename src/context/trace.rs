@@ -42,4 +42,8 @@ impl Trace {
         }
         println!("! {}", err);
     }
+
+    pub fn clear(&mut self) {
+        self.stack.clear()
+    }
 }
