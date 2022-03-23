@@ -40,6 +40,8 @@ $ cat factorial-short.lisp
 $ cargo run <./factorial-short.lisp
 5! = 120
 ```
+
+```
 $ cargo run
 > (+ 1
 |    2)
@@ -81,6 +83,7 @@ $ cargo run
 - `(map list function)`: apply each values in the list to the function, and returns the results as a list. the function's signature is `(func (current-value))`.
 - `(fold list function)`: apply each values in the list to the function, and accumulate result. the function's signature is `(func (accumulated-value current-value))`.
 - `(do values...)`: compute values in a new scope and returns the last value.
+- `(panic! message...)`: report critical error and exit program.
 
 ### operators
 - `(+ numbers-or-strings...)`: add numbers, or join strings.

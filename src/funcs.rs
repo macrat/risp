@@ -56,6 +56,13 @@ impl Callable for Def {
     }
 
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        if args.len() != 2 {
+            return Err(RError::Argument(format!(
+                "`def` needs exact 2 arguments but got `{}`.",
+                args
+            )));
+        }
+
         let value = match args[1].compute(ctx) {
             Ok(x) => x,
             Err(err) => return Err(err),
@@ -114,7 +121,7 @@ impl Callable for Import {
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 1 {
             return Err(RError::Argument(format!(
-                "`import` needs exact 1 arguments but got `{}`.",
+                "`import` needs exact 1 argument but got `{}`.",
                 args
             )));
         }
@@ -148,6 +155,22 @@ impl Callable for Print<'_> {
                 print!("{}{}", x.to_bare_string(), self.1);
                 Ok(RType::nil())
             }
+            Err(err) => Err(err),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Panic;
+
+impl Callable for Panic {
+    fn name(&self) -> &str {
+        "panic!"
+    }
+
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        match args.compute_each(ctx) {
+            Ok(x) => Err(RError::User(x.to_bare_string())),
             Err(err) => Err(err),
         }
     }
@@ -193,7 +216,7 @@ impl Callable for Do {
     }
 
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        args.compute_last(ctx)
+        args.compute_last(&mut ctx.child())
     }
 }
 
@@ -579,6 +602,29 @@ impl Callable for TypeCheckOperator<'_> {
     }
 }
 
+#[derive(Debug)]
+struct NotOperator;
+
+impl Callable for NotOperator {
+    fn name(&self) -> &str {
+        "not"
+    }
+
+    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        if args.len() != 1 {
+            return Err(RError::Argument(format!(
+                "`not` needs exact 1 argument but got `{}`.",
+                args
+            )));
+        }
+
+        match args[0].compute(ctx) {
+            Ok(x) => Ok(RType::Atom(RAtom::Int(if x.as_bool() { 0 } else { 1 }))),
+            Err(err) => Err(err),
+        }
+    }
+}
+
 macro_rules! binary_func {
     ($func:expr) => {
         Rc::new(RType::Func(Rc::new(RFunc::Binary(Box::new($func)))))
@@ -597,6 +643,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
     register!(scope, "def", binary_func!(Def));
     register!(scope, "set", binary_func!(Set));
     register!(scope, "import", binary_func!(Import));
+    register!(scope, "panic!", binary_func!(Panic));
 
     register!(scope, "func", binary_func!(Func));
 
@@ -646,6 +693,8 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
             _ => false,
         }))
     );
+
+    register!(scope, "not", binary_func!(NotOperator));
 
     register!(
         scope,
@@ -928,320 +977,12 @@ mod test {
     }
 
     #[test]
-    fn func() {
-        assert_atom(
-            RAtom::Int(120),
-            r"
-                (def f (func (x)
-                  (def l (func (n)
-                    (if (> n 1) (do
-                      (set x (* x n))
-                      (l (- n 1))))
-                      x))
-                  (l (- x 1))))
-                (f 5)
-            ",
+    fn panic() {
+        assert_err(
+            RError::User(String::from("hello world")),
+            r#"(panic! "hello" "world")"#,
         );
 
-        assert_atom(
-            RAtom::Int(120),
-            r"
-                (def f (func (x)
-                  (def n x)
-                  (while (> n 1)
-                    (set n (- n 1))
-                    (set x (* x n)))))
-
-                (f 5)
-            ",
-        );
-
-        assert_atom(
-            RAtom::Int(120),
-            r"
-                (def f (func (x)
-                  (map (seq (- x 1))
-                    (func (n) (set x (* x n))))
-                  x))
-
-                (f 5)
-            ",
-        );
-
-        assert_atom(
-            RAtom::Int(120),
-            r"
-                (def f (func (x)
-                  (fold (seq x) *)))
-
-                (f 5)
-            ",
-        );
-
-        assert_atom(
-            RAtom::Int(1),
-            r#"
-                (def counter (do
-                  (def x 0)
-                  (func ()
-                    (set x (+ x 1))
-                    x)))
-
-                (def xs (list
-                  (counter)
-                  (counter)
-                  (counter)))
-
-                (println "xs =" xs)
-                (= xs (list 1 2 3))
-            "#,
-        );
-    }
-
-    #[test]
-    fn seq() {
-        assert_atom(
-            RAtom::Int(1),
-            "(println (seq 5)) (= (seq 5) (list 1 2 3 4 5))",
-        );
-        assert_atom(
-            RAtom::Int(1),
-            "(println (seq (- 3))) (= (seq (- 3)) (list (- 1) (- 2) (- 3)))",
-        );
-        assert_atom(RAtom::Int(1), "(println (seq 0)) (= (seq 0) ())");
-
-        assert_atom(
-            RAtom::Int(1),
-            "(println (seq 5 8)) (= (seq 5 8) (list 5 6 7 8))",
-        );
-        assert_atom(
-            RAtom::Int(1),
-            "(println (seq 8 5)) (= (seq 8 5) (list 8 7 6 5))",
-        );
-        assert_atom(RAtom::Int(1), "(println (seq 5 5)) (= (seq 5 5) (list 5))");
-        assert_atom(RAtom::Int(1), "(println (seq 0 0)) (= (seq 0 0) (list 0))");
-    }
-
-    #[test]
-    fn list_car_cdr() {
-        assert_atom(RAtom::Int(123), "(car (list 123 456))");
-        assert_atom(RAtom::Int(456), "(car (cdr (list 123 456)))");
-
-        assert_atom(
-            RAtom::Int(12),
-            r"
-                (def xs (list 12 34))
-                (def ys xs)
-                (car ys)
-            ",
-        );
-    }
-
-    #[test]
-    fn string_car_cdr() {
-        assert_atom(RAtom::String("h".into()), r#"(car "hello")"#);
-        assert_atom(RAtom::String("e".into()), r#"(car (cdr "hello"))"#);
-        assert_atom(RAtom::String("llo".into()), r#"(cdr (cdr "hello"))"#);
-    }
-
-    #[test]
-    fn if_() {
-        assert_atom(
-            RAtom::Int(1),
-            r"
-                (def result 0)
-                (if 1
-                  (set result 1)
-                  (set result 2))
-                result
-            ",
-        );
-
-        assert_atom(
-            RAtom::Int(2),
-            r"
-                (def result 0)
-                (if 0
-                  (set result 1)
-                  (set result 2))
-                result
-            ",
-        );
-
-        assert_atom(
-            RAtom::Int(2),
-            r"
-                (def result 0)
-                (if ()
-                  (set result 1)
-                  (set result 2))
-                result
-            ",
-        );
-    }
-
-    #[test]
-    fn map() {
-        assert_atom(
-            RAtom::Int(1),
-            r"
-                (def f (func (x) (* x 2)))
-
-                (def xs (map (seq 5) f))
-
-                (println xs)
-                (= xs (list 2 4 6 8 10))
-            ",
-        );
-    }
-
-    #[test]
-    fn fold() {
-        assert_atom(RAtom::Int(15), "(fold (seq 5) +)");
-        assert_atom(RAtom::Int(120), "(fold (seq 5) *)");
-        assert_atom(
-            RAtom::String("hello".into()),
-            r#"(fold (list "he" "l" "lo") +)"#,
-        );
-    }
-
-    #[cfg(test)]
-    mod type_check {
-        use super::*;
-
-        #[test]
-        fn is_int() {
-            assert_atom(RAtom::Int(1), "(is-int 2)");
-            assert_atom(RAtom::Int(0), "(is-int \"hello\")");
-            assert_atom(RAtom::Int(0), "(is-int (list 12 34))");
-            assert_atom(RAtom::Int(0), "(is-int if)");
-        }
-
-        #[test]
-        fn is_string() {
-            assert_atom(RAtom::Int(0), "(is-string 2)");
-            assert_atom(RAtom::Int(1), "(is-string \"hello\")");
-            assert_atom(RAtom::Int(0), "(is-string (list 12 34))");
-            assert_atom(RAtom::Int(0), "(is-string if)");
-        }
-
-        #[test]
-        fn is_list() {
-            assert_atom(RAtom::Int(0), "(is-list 2)");
-            assert_atom(RAtom::Int(0), "(is-list \"hello\")");
-            assert_atom(RAtom::Int(1), "(is-list (list 12 34))");
-            assert_atom(RAtom::Int(0), "(is-list if)");
-        }
-
-        #[test]
-        fn is_func() {
-            assert_atom(RAtom::Int(0), "(is-func 2)");
-            assert_atom(RAtom::Int(0), "(is-func \"hello\")");
-            assert_atom(RAtom::Int(0), "(is-func (list 12 34))");
-            assert_atom(RAtom::Int(1), "(is-func if)");
-        }
-    }
-
-    #[cfg(test)]
-    mod compare {
-        use super::*;
-
-        #[test]
-        fn eq_ne() {
-            assert_atom(RAtom::Int(1), "(= 1 1)");
-            assert_atom(RAtom::Int(0), "(= 1 2)");
-            assert_atom(RAtom::Int(1), "(= 2 2)");
-            assert_atom(RAtom::Int(1), "(= (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(0), "(= (list 1 2 4) (list 1 2 3))");
-            assert_atom(RAtom::Int(0), "(= (list 1 2 3 4) (list 1 2 3))");
-            assert_atom(RAtom::Int(1), "(= () (list))");
-
-            assert_atom(RAtom::Int(1), "(= println println)");
-            assert_atom(RAtom::Int(0), "(= if println)");
-
-            assert_atom(RAtom::Int(1), "(def f (func ())) (= f f)");
-            assert_atom(RAtom::Int(0), "(def f (func ())) (= f (func ()))");
-
-            assert_atom(RAtom::Int(0), "(!= 1 1)");
-            assert_atom(RAtom::Int(1), "(!= 1 2)");
-            assert_atom(RAtom::Int(0), "(!= if if)");
-            assert_atom(RAtom::Int(1), "(!= if println)");
-        }
-
-        #[test]
-        fn lt() {
-            assert_atom(RAtom::Int(1), "(< 1 2)");
-            assert_atom(RAtom::Int(0), "(< 2 2)");
-            assert_atom(RAtom::Int(0), "(< 3 2)");
-
-            assert_atom(RAtom::Int(1), "(< 1 2 3)");
-            assert_atom(RAtom::Int(0), "(< 1 2 2)");
-            assert_atom(RAtom::Int(0), "(< 1 2 1)");
-
-            assert_atom(RAtom::Int(1), "(< (list 1 2 3) (list 2 2 3))");
-            assert_atom(RAtom::Int(0), "(< (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(0), "(< (list 1 2 3) (list 0 2 3))");
-
-            assert_atom(RAtom::Int(1), "(< (list 1 2 3) (list 1 2 3 4))");
-            assert_atom(RAtom::Int(0), "(< (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(0), "(< (list 1 2 3 4) (list 1 2 3))");
-        }
-
-        #[test]
-        fn le() {
-            assert_atom(RAtom::Int(1), "(<= 1 2)");
-            assert_atom(RAtom::Int(1), "(<= 2 2)");
-            assert_atom(RAtom::Int(0), "(<= 3 2)");
-
-            assert_atom(RAtom::Int(1), "(<= 1 2 3)");
-            assert_atom(RAtom::Int(1), "(<= 1 2 2)");
-            assert_atom(RAtom::Int(0), "(<= 1 2 1)");
-
-            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 2 2 3))");
-            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(0), "(<= (list 1 2 3) (list 0 2 3))");
-
-            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 1 2 3 4))");
-            assert_atom(RAtom::Int(1), "(<= (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(0), "(<= (list 1 2 3 4) (list 1 2 3))");
-        }
-
-        #[test]
-        fn gt() {
-            assert_atom(RAtom::Int(0), "(> 1 2)");
-            assert_atom(RAtom::Int(0), "(> 2 2)");
-            assert_atom(RAtom::Int(1), "(> 3 2)");
-
-            assert_atom(RAtom::Int(0), "(> 3 2 3)");
-            assert_atom(RAtom::Int(0), "(> 3 2 2)");
-            assert_atom(RAtom::Int(1), "(> 3 2 1)");
-
-            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 2 2 3))");
-            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(1), "(> (list 1 2 3) (list 0 2 3))");
-
-            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 1 2 3 4))");
-            assert_atom(RAtom::Int(0), "(> (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(1), "(> (list 1 2 3 4) (list 1 2 3))");
-        }
-
-        #[test]
-        fn ge() {
-            assert_atom(RAtom::Int(0), "(>= 1 2)");
-            assert_atom(RAtom::Int(1), "(>= 2 2)");
-            assert_atom(RAtom::Int(1), "(>= 3 2)");
-
-            assert_atom(RAtom::Int(0), "(>= 3 2 3)");
-            assert_atom(RAtom::Int(1), "(>= 3 2 2)");
-            assert_atom(RAtom::Int(1), "(>= 3 2 1)");
-
-            assert_atom(RAtom::Int(0), "(>= (list 1 2 3) (list 2 2 3))");
-            assert_atom(RAtom::Int(1), "(>= (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(1), "(>= (list 1 2 3) (list 0 2 3))");
-
-            assert_atom(RAtom::Int(0), "(>= (list 1 2 3) (list 1 2 3 4))");
-            assert_atom(RAtom::Int(1), "(>= (list 1 2 3) (list 1 2 3))");
-            assert_atom(RAtom::Int(1), "(>= (list 1 2 3 4) (list 1 2 3))");
-        }
+        assert_err(RError::User(String::from("")), "(panic!)");
     }
 }

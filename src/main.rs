@@ -5,6 +5,9 @@ mod funcs;
 mod parser;
 mod types;
 
+#[cfg(test)]
+mod test;
+
 fn compute(ctx: &mut context::Context, parser: &mut parser::Parser, show_prompt: bool) {
     loop {
         ctx.reset_trace();

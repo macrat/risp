@@ -1,0 +1,50 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./tests/test.risp") assert))
+
+(do
+  (def result 0)
+  (if 1
+    (set result 1)
+    (set result 2))
+  (assert = 1 result))
+
+(do
+  (def result 0)
+  (if 1
+    (set result 1))
+  (assert = 1 result))
+
+(do
+  (def result 0)
+  (if 0
+    (set result 1))
+  (assert = 0 result))
+
+(do
+  (def result 0)
+  (if "hello"
+    (set result 1)
+    (set result 2))
+  (assert = 1 result))
+
+(do
+  (def result 0)
+  (if ()
+    (set result 1)
+    (set result 2))
+  (assert = 2 result))
+
+(do
+  (def result 0)
+  (if (not ())
+    (set result 1)
+    (set result 2))
+  (assert = 1 result))
+
+(do
+  (def result 0)
+  (if (not (= 1 1))
+    (set result 1)
+    (set result 2))
+  (assert = 2 result))

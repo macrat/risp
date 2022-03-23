@@ -1,0 +1,31 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./tests/test.risp") assert))
+
+(do "tests of `is-int`"
+  (assert = 1 (is-int 2))
+  (assert = 0 (is-int "hello"))
+  (assert = 0 (is-int (list 12 34)))
+  (assert = 0 (is-int if))
+)
+
+(do "tests of `is-string`"
+  (assert = 0 (is-string 2))
+  (assert = 1 (is-string "hello"))
+  (assert = 0 (is-string (list 12 34)))
+  (assert = 0 (is-string if))
+)
+
+(do "tests of `is-list`"
+  (assert = 0 (is-list 2))
+  (assert = 0 (is-list "hello"))
+  (assert = 1 (is-list (list 12 34)))
+  (assert = 0 (is-list if))
+)
+
+(do "tests of `is-func`"
+  (assert = 0 (is-func 2))
+  (assert = 0 (is-func "hello"))
+  (assert = 0 (is-func (list 12 34)))
+  (assert = 1 (is-func if))
+)

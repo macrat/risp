@@ -28,13 +28,23 @@ impl Module {
                         return Err(err);
                     }
                 }
-                Err(err) => return Err(RError::IO(format!("{}", err))),
+                Err(err) => return Err(RError::IO(format!("failed to read {}: {}", name, err))),
             };
 
             while let Some(expr) = parser.pop() {
                 if let Err(err) = expr.compute(ctx) {
                     return Err(err);
                 }
+            }
+        }
+
+        if let Err(err) = parser.close() {
+            return Err(err);
+        }
+
+        while let Some(expr) = parser.pop() {
+            if let Err(err) = expr.compute(ctx) {
+                return Err(err);
             }
         }
 

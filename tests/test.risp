@@ -1,0 +1,8 @@
+" Utilities for test "
+" vim: set ft=lisp : "
+
+(def assert (func (operator wanted actual)
+  (if (not (operator wanted actual))
+    (panic! "assertion unsatisfied:" wanted operator actual))))
+
+(assert = 1 1)

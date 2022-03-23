@@ -1,0 +1,17 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./tests/test.risp") assert))
+
+(assert = (list 1 2 3 4 5) (seq 5))
+(assert = (list (- 1) (- 2) (- 3)) (seq (- 3)))
+
+(assert = (list 3 4 5) (seq 3 5))
+(assert = (list 5 4 3) (seq 5 3))
+
+(assert = (list (- 1) 0 1 2) (seq (- 1) 2))
+(assert = (list 1 0 (- 1) (- 2)) (seq 1 (- 2)))
+
+(assert = (list 5) (seq 5 5))
+(assert = (list 0) (seq 0 0))
+
+(assert = () (seq 0))

@@ -17,6 +17,7 @@ pub enum RError {
     InvalidLiteral(String),
     InvalidEscape(char),
     IO(String),
+    User(String),
 }
 
 fn escape_string(s: &String) -> String {
@@ -51,6 +52,7 @@ impl fmt::Display for RError {
                 c
             ),
             RError::IO(reason) => write!(f, "IOError: {}", reason),
+            RError::User(message) => write!(f, "UserError: {}", message),
         }
     }
 }

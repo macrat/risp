@@ -64,7 +64,7 @@ impl Context {
         }
 
         match module::Module::load(
-            &mut self.overload(Rc::clone(&self.root_scope)),
+            &mut self.overload(Rc::clone(&self.root_scope)).child(),
             name.clone(),
         ) {
             Ok(module) => {

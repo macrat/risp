@@ -1,0 +1,15 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./tests/test.risp") assert))
+
+(do "map"
+  (def f (func (x) (* x 2)))
+  (def xs (map (seq 5) f))
+  (assert = (list 2 4 6 8 10) xs)
+
+  (assert = (list 0 1 0) (map (seq (- 1) 1) not)))
+
+(do "fold"
+  (assert = 15 (fold (seq 5) +))
+  (assert = 120 (fold (seq 5) *))
+  (assert = "hello" (fold (list "he" "l" "lo") +)))

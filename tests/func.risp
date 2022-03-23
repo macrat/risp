@@ -1,0 +1,46 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./tests/test.risp") assert))
+
+
+(do "recursive loop"
+  (def f (func (x)
+    (def l (func (n)
+      (if (> n 1) (do
+        (set x (* x n))
+        (l (- n 1))))
+        x))
+    (l (- x 1))))
+
+  (assert = 120 (f 5)))
+
+(do "while loop"
+  (def f (func (x)
+    (def n x)
+    (while (> n 1)
+      (set n (- n 1))
+      (set x (* x n)))))
+
+  (assert = 120 (f 5)))
+
+(do "higher order operation"
+  (def f (func (x)
+    (map (seq (- x 1))
+      (func (n) (set x (* x n))))
+    x))
+
+  (assert = 120 (f 5)))
+
+(do "capture scope"
+  (def counter (do
+    (def x 0)
+    (func ()
+      (set x (+ x 1))
+      x)))
+
+  (def xs (list
+    (counter)
+    (counter)
+    (counter)))
+
+  (assert = xs (list 1 2 3)))

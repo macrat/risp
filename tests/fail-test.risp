@@ -1,0 +1,6 @@
+" This test should be failed"
+" vim: set ft=lisp : "
+
+(def assert ((import "./tests/test.risp") assert))
+
+(assert = 1 2)
