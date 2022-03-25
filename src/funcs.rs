@@ -152,7 +152,7 @@ impl Callable for Print<'_> {
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         match args.compute_each(ctx) {
             Ok(x) => {
-                print!("{}{}", x.to_bare_string(), self.1);
+                print!("{}{}", x.to_bare_printable(), self.1);
                 Ok(RType::nil())
             }
             Err(err) => Err(err),
@@ -169,9 +169,16 @@ impl Callable for Panic {
     }
 
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        match args.compute_each(ctx) {
-            Ok(x) => Err(RError::User(x.to_bare_string())),
-            Err(err) => Err(err),
+        match args.len() {
+            0 => Err(RError::User(RType::nil())),
+            1 => match args[0].compute(ctx) {
+                Ok(x) => Err(RError::User(x)),
+                Err(err) => Err(err),
+            },
+            _ => Err(RError::Argument(format!(
+                "`panic!` needs 0 or 1 argument but got {}",
+                args
+            ))),
         }
     }
 }
@@ -749,7 +756,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                     if let RType::Atom(RAtom::String(x)) = x {
                         result += &x;
                     } else {
-                        return Err(RError::Type(format!("`+` can not apply to `{}`", x)));
+                        return Err(RError::Type(format!("`+` can not apply to {}", x)));
                     }
                 }
                 Ok(RType::Atom(RAtom::String(result)))
@@ -759,7 +766,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                     if let RType::Atom(RAtom::Int(x)) = x {
                         result += x;
                     } else {
-                        return Err(RError::Type(format!("`+` can not apply to `{}`", x)));
+                        return Err(RError::Type(format!("`+` can not apply to {}", x)));
                     }
                 }
                 Ok(RType::Atom(RAtom::Int(result)))
@@ -779,21 +786,21 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                     if let RType::Atom(RAtom::Int(x)) = xs[0] {
                         Ok(RType::Atom(RAtom::Int(-x)))
                     } else {
-                        Err(RError::Type(format!("`-` can not apply to `{}`", xs[0])))
+                        Err(RError::Type(format!("`-` can not apply to {}", xs[0])))
                     }
                 }
                 _ => {
                     let mut result = if let RType::Atom(RAtom::Int(x)) = xs[0] {
                         x
                     } else {
-                        return Err(RError::Type(format!("`-` can not apply to `{}`", xs[0])));
+                        return Err(RError::Type(format!("`-` can not apply to {}", xs[0])));
                     };
 
                     for x in &xs[1..] {
                         if let RType::Atom(RAtom::Int(x)) = x {
                             result -= *x;
                         } else {
-                            return Err(RError::Type(format!("`-` can not apply to `{}`", x)));
+                            return Err(RError::Type(format!("`-` can not apply to {}", x)));
                         }
                     }
 
@@ -818,7 +825,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                 if let RType::Atom(RAtom::Int(x)) = x {
                     result *= x;
                 } else {
-                    return Err(RError::Type(format!("`*` can not apply to `{}`", x)));
+                    return Err(RError::Type(format!("`*` can not apply to {}", x)));
                 }
             }
             Ok(RType::Atom(RAtom::Int(result)))
@@ -838,14 +845,14 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
             let mut result = if let RType::Atom(RAtom::Int(x)) = xs[0] {
                 x
             } else {
-                return Err(RError::Type(format!("`/` can not apply to `{}`", xs[0])));
+                return Err(RError::Type(format!("`/` can not apply to {}", xs[0])));
             };
 
             for x in &xs[1..] {
                 if let RType::Atom(RAtom::Int(x)) = x {
                     result /= *x;
                 } else {
-                    return Err(RError::Type(format!("`/` can not apply to `{}`", x)));
+                    return Err(RError::Type(format!("`/` can not apply to {}", x)));
                 }
             }
 
@@ -913,11 +920,11 @@ mod test {
             );
 
             assert_err(
-                RError::Type(String::from("`+` can not apply to `123`")),
+                RError::Type(String::from("`+` can not apply to 123")),
                 r#"(+ "hello" 123)"#,
             );
             assert_err(
-                RError::Type(String::from("`+` can not apply to `hello`")),
+                RError::Type(String::from("`+` can not apply to \"hello\"")),
                 r#"(+ 123 "hello")"#,
             );
         }
@@ -979,10 +986,15 @@ mod test {
     #[test]
     fn panic() {
         assert_err(
-            RError::User(String::from("hello world")),
-            r#"(panic! "hello" "world")"#,
+            RError::User(RType::Atom(RAtom::String(String::from("hello world")))),
+            r#"(panic! "hello world")"#,
         );
 
-        assert_err(RError::User(String::from("")), "(panic!)");
+        assert_err(
+            RError::User(RType::Atom(RAtom::Int(123))),
+            r#"(panic! 123)"#,
+        );
+
+        assert_err(RError::User(RType::nil()), "(panic!)");
     }
 }

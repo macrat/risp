@@ -3,7 +3,6 @@ use std::fs;
 use crate::context::scope::Scope;
 use crate::context::Context;
 use crate::funcs::register_to;
-use crate::types::RError;
 
 fn execute_test(source: String) {
     let mut ctx = Context::new(Scope::new());
@@ -27,8 +26,8 @@ fn fail_test() {
         Ok(x) => panic!("expected error but got `{}`.", x),
         Err(err) => {
             assert_eq!(
-                RError::User(String::from("assertion unsatisfied: 1 = 2")),
-                err
+                r#"UserError: ("assertion unsatisfied" (= 1 2))"#,
+                err.to_string()
             );
         }
     }

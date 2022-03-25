@@ -17,7 +17,7 @@ pub enum RError {
     InvalidLiteral(String),
     InvalidEscape(char),
     IO(String),
-    User(String),
+    User(RType),
 }
 
 fn escape_string(s: &String) -> String {
@@ -52,7 +52,7 @@ impl fmt::Display for RError {
                 c
             ),
             RError::IO(reason) => write!(f, "IOError: {}", reason),
-            RError::User(message) => write!(f, "UserError: {}", message),
+            RError::User(message) => write!(f, "UserError: {}", message.to_string()),
         }
     }
 }
@@ -82,6 +82,14 @@ impl RAtom {
             RAtom::String(s) => s.len() != 0,
         }
     }
+
+    pub fn to_printable(&self) -> String {
+        match self {
+            RAtom::Symbol(name) => name.clone(),
+            RAtom::Int(value) => format!("{}", value),
+            RAtom::String(value) => format!("{}", value),
+        }
+    }
 }
 
 impl fmt::Display for RAtom {
@@ -89,7 +97,7 @@ impl fmt::Display for RAtom {
         match self {
             RAtom::Symbol(name) => write!(f, "{}", name),
             RAtom::Int(value) => write!(f, "{}", value),
-            RAtom::String(value) => write!(f, "{}", value),
+            RAtom::String(value) => write!(f, "{:?}", value),
         }
     }
 }
@@ -165,6 +173,18 @@ impl RList {
             vec.push(x.to_string());
         }
         vec.join(" ")
+    }
+
+    pub fn to_bare_printable(&self) -> String {
+        let mut vec: Vec<String> = Vec::new();
+        for x in &self.0 {
+            vec.push(x.to_printable());
+        }
+        vec.join(" ")
+    }
+
+    pub fn to_printable(&self) -> String {
+        format!("({})", self.to_bare_printable())
     }
 
     pub fn len(&self) -> usize {
@@ -274,6 +294,12 @@ pub enum RFunc {
     Binary(Box<dyn Callable>),
 }
 
+impl RFunc {
+    pub fn to_printable(&self) -> String {
+        self.to_string()
+    }
+}
+
 impl Callable for RFunc {
     fn name(&self) -> &str {
         match self {
@@ -377,6 +403,14 @@ impl RType {
             RType::Atom(atom) => atom.as_bool(),
             RType::List(list) => list.as_bool(),
             RType::Func(_) => true,
+        }
+    }
+
+    pub fn to_printable(&self) -> String {
+        match self {
+            RType::Atom(atom) => atom.to_printable(),
+            RType::List(list) => list.to_printable(),
+            RType::Func(func) => func.to_printable(),
         }
     }
 }

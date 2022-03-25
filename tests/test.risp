@@ -3,6 +3,6 @@
 
 (def assert (func (operator wanted actual)
   (if (not (operator wanted actual))
-    (panic! "assertion unsatisfied:" wanted operator actual))))
+    (panic! (list "assertion unsatisfied" (list operator wanted actual))))))
 
 (assert = 1 1)
