@@ -43,7 +43,7 @@ impl fmt::Display for RError {
             }
             RError::InvalidLiteral(literal) => write!(
                 f,
-                "InvalidLiteralError: {}... is invalid literal.",
+                "InvalidLiteralError: {} is invalid literal.",
                 escape_string(literal),
             ),
             RError::InvalidEscape(c) => write!(
@@ -60,7 +60,7 @@ impl fmt::Display for RError {
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum RAtom {
     Symbol(String),
-    Int(i64),
+    Number(f64),
     String(String),
 }
 
@@ -78,7 +78,7 @@ impl RAtom {
     pub fn as_bool(&self) -> bool {
         match self {
             RAtom::Symbol(_) => true,
-            RAtom::Int(i) => *i != 0,
+            RAtom::Number(n) => *n != 0.0,
             RAtom::String(s) => s.len() != 0,
         }
     }
@@ -86,7 +86,7 @@ impl RAtom {
     pub fn to_printable(&self) -> String {
         match self {
             RAtom::Symbol(name) => name.clone(),
-            RAtom::Int(value) => format!("{}", value),
+            RAtom::Number(value) => format!("{}", value),
             RAtom::String(value) => format!("{}", value),
         }
     }
@@ -96,7 +96,7 @@ impl fmt::Display for RAtom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             RAtom::Symbol(name) => write!(f, "{}", name),
-            RAtom::Int(value) => write!(f, "{}", value),
+            RAtom::Number(value) => write!(f, "{}", value),
             RAtom::String(value) => write!(f, "{:?}", value),
         }
     }
@@ -392,7 +392,16 @@ impl RType {
 
     pub fn cmp(&self, other: &RType) -> Result<Ordering, RError> {
         match (self, other) {
-            (RType::Atom(RAtom::Int(x)), RType::Atom(RAtom::Int(y))) => Ok(x.cmp(y)),
+            (RType::Atom(RAtom::Number(x)), RType::Atom(RAtom::Number(y))) => {
+                if let Some(ord) = x.partial_cmp(y) {
+                    Ok(ord)
+                } else {
+                    Err(RError::Type(format!(
+                        "`{}` and `{}` are not comparable.",
+                        self, other
+                    )))
+                }
+            }
             (RType::Atom(RAtom::String(x)), RType::Atom(RAtom::String(y))) => Ok(x.cmp(y)),
             (RType::List(x), RType::List(y)) => x.cmp(y),
             (_, _) => Err(RError::Type(format!(

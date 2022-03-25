@@ -7,7 +7,7 @@
   (def xs (map (seq 5) f))
   (assert = (list 2 4 6 8 10) xs)
 
-  (assert = (list 0 1 0) (map (seq (- 1) 1) not)))
+  (assert = (list 0 1 0) (map (seq -1 1) not)))
 
 (do "fold"
   (assert = 15 (fold (seq 5) +))

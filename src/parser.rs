@@ -6,12 +6,13 @@ use crate::types::{RAtom, RError, RList, RType};
 #[derive(Debug)]
 enum AtomBuilder {
     Symbol(String),
-    Int(String),
+    Number(String),
     String {
         buf: String,
         escape: bool,
         completed: bool,
     },
+    Invalid(String),
     Nil,
 }
 
@@ -19,9 +20,9 @@ impl AtomBuilder {
     fn new(c: char) -> AtomBuilder {
         let mut buf = String::new();
 
-        if '0' <= c && c <= '9' {
+        if '0' <= c && c <= '9' || c == '-' {
             buf.push(c);
-            AtomBuilder::Int(buf)
+            AtomBuilder::Number(buf)
         } else if '"' == c {
             AtomBuilder::String {
                 buf,
@@ -48,10 +49,14 @@ impl AtomBuilder {
     fn push(&mut self, c: char) -> Result<bool, RError> {
         match self {
             AtomBuilder::Symbol(buf) => buf.push(c),
-            AtomBuilder::Int(buf) => {
+            AtomBuilder::Number(buf) => {
                 buf.push(c);
-                if c < '0' || '9' < c {
-                    return Err(RError::InvalidLiteral(buf.clone()));
+                if (c < '0' || '9' < c) && c != '.' {
+                    *self = if buf.chars().nth(0) == Some('-') && buf.len() == 2 {
+                        AtomBuilder::Symbol(buf.clone())
+                    } else {
+                        AtomBuilder::Invalid(buf.clone())
+                    }
                 }
             }
             AtomBuilder::String {
@@ -89,6 +94,7 @@ impl AtomBuilder {
                     }
                 }
             }
+            AtomBuilder::Invalid(buf) => buf.push(c),
             AtomBuilder::Nil => {
                 *self = AtomBuilder::new(c);
             }
@@ -99,12 +105,13 @@ impl AtomBuilder {
     fn get_buf(&self) -> String {
         match self {
             AtomBuilder::Symbol(buf) => buf.clone(),
-            AtomBuilder::Int(buf) => buf.clone(),
+            AtomBuilder::Number(buf) => buf.clone(),
             AtomBuilder::String {
                 buf,
                 escape: _,
                 completed: _,
             } => buf.clone(),
+            AtomBuilder::Invalid(buf) => buf.clone(),
             AtomBuilder::Nil => String::new(),
         }
     }
@@ -112,8 +119,9 @@ impl AtomBuilder {
     fn build(&mut self) -> Result<RAtom, RError> {
         let result = match self {
             AtomBuilder::Symbol(buf) => Ok(RAtom::Symbol(buf.clone())),
-            AtomBuilder::Int(buf) => match buf.parse::<i64>() {
-                Ok(i) => Ok(RAtom::Int(i)),
+            AtomBuilder::Number(buf) if buf == "-" => Ok(RAtom::Symbol(buf.clone())),
+            AtomBuilder::Number(buf) => match buf.parse::<f64>() {
+                Ok(n) => Ok(RAtom::Number(n)),
                 Err(_) => Err(RError::InvalidLiteral(buf.clone())),
             },
             AtomBuilder::String {
@@ -126,6 +134,7 @@ impl AtomBuilder {
                 escape: _,
                 completed: true,
             } => Ok(RAtom::String(buf.clone())),
+            AtomBuilder::Invalid(buf) => Err(RError::InvalidLiteral(buf.clone())),
             AtomBuilder::Nil => Err(RError::InvalidLiteral(String::new())),
         };
         *self = AtomBuilder::Nil;
@@ -294,16 +303,28 @@ pub mod test {
     fn symbol() {
         assert_symbol("hello", "hello");
         assert_symbol("hello-world", " hello-world ");
+        assert_symbol("-abc123", " -abc123 ");
+        assert_symbol("-", " - ");
     }
 
     #[test]
     fn int() {
-        assert_atom(RAtom::Int(1), "1");
-        assert_atom(RAtom::Int(2), " 2 ");
-        assert_atom(RAtom::Int(42), " 42 ");
+        assert_atom(RAtom::Number(1.0), "1");
+        assert_atom(RAtom::Number(2.0), " 2 ");
+        assert_atom(RAtom::Number(42.0), " 42 ");
+        assert_atom(RAtom::Number(12.345), " 12.345 ");
+        assert_atom(RAtom::Number(-1.234), " -1.234 ");
 
-        assert_err(RError::InvalidLiteral(String::from("0h")), "0hello");
-        assert_err(RError::InvalidLiteral(String::from("123_")), "123_456");
+        assert_err(
+            RError::InvalidLiteral(String::from("0hello")),
+            "0hello world1",
+        );
+        assert_err(RError::InvalidLiteral(String::from("-1abc")), "-1abc");
+        assert_err(
+            RError::InvalidLiteral(String::from("123_456")),
+            "123_456 abc",
+        );
+        assert_err(RError::InvalidLiteral(String::from("12.34.56")), "12.34.56");
     }
 
     #[test]

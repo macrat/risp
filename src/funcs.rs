@@ -417,7 +417,7 @@ impl Callable for Seq {
         };
 
         let to = match &args[args.len() - 1] {
-            RType::Atom(RAtom::Int(n)) => *n,
+            RType::Atom(RAtom::Number(n)) => *n,
             x => {
                 return Err(RError::Argument(format!(
                     "`seq` needs 1 or 2 int argument but got `{}`",
@@ -425,13 +425,13 @@ impl Callable for Seq {
                 )))
             }
         };
-        if args.len() == 1 && to == 0 {
+        if args.len() == 1 && to == 0.0 {
             return Ok(RType::nil());
         }
 
         let from = if args.len() == 2 {
             match &args[0] {
-                RType::Atom(RAtom::Int(n)) => *n,
+                RType::Atom(RAtom::Number(n)) => *n,
                 x => {
                     return Err(RError::Argument(format!(
                         "`seq` needs 1 or 2 int argument but got `{}`",
@@ -439,21 +439,21 @@ impl Callable for Seq {
                     )))
                 }
             }
-        } else if to > 0 {
-            1
+        } else if to > 0.0 {
+            1.0
         } else {
-            -1
+            -1.0
         };
 
-        let step = if from < to { 1 } else { -1 };
+        let step = if from < to { 1.0 } else { -1.0 };
 
         let mut result = RList::empty(None);
         let mut i = from;
         while i != to {
-            result.push(RType::Atom(RAtom::Int(i)));
+            result.push(RType::Atom(RAtom::Number(i)));
             i += step;
         }
-        result.push(RType::Atom(RAtom::Int(i)));
+        result.push(RType::Atom(RAtom::Number(i)));
         Ok(RType::List(result))
     }
 }
@@ -565,7 +565,7 @@ impl Callable for CompareOperator<'_> {
             match y.compute(ctx) {
                 Ok(y) => {
                     match self.1(&x, &y) {
-                        Ok(false) => return Ok(RType::Atom(RAtom::Int(0))),
+                        Ok(false) => return Ok(RType::Atom(RAtom::Number(0.0))),
                         Err(err) => return Err(err),
                         _ => {}
                     }
@@ -575,7 +575,7 @@ impl Callable for CompareOperator<'_> {
             }
         }
 
-        Ok(RType::Atom(RAtom::Int(1)))
+        Ok(RType::Atom(RAtom::Number(1.0)))
     }
 }
 
@@ -605,13 +605,13 @@ impl Callable for TypeCheckOperator<'_> {
         for x in args.iter() {
             match x.compute(ctx) {
                 Ok(x) if self.1(&x) => {
-                    return Ok(RType::Atom(RAtom::Int(1)));
+                    return Ok(RType::Atom(RAtom::Number(1.0)));
                 }
                 Err(err) => return Err(err),
                 _ => {}
             }
         }
-        Ok(RType::Atom(RAtom::Int(0)))
+        Ok(RType::Atom(RAtom::Number(0.0)))
     }
 }
 
@@ -632,7 +632,11 @@ impl Callable for NotOperator {
         }
 
         match args[0].compute(ctx) {
-            Ok(x) => Ok(RType::Atom(RAtom::Int(if x.as_bool() { 0 } else { 1 }))),
+            Ok(x) => Ok(RType::Atom(RAtom::Number(if x.as_bool() {
+                0.0
+            } else {
+                1.0
+            }))),
             Err(err) => Err(err),
         }
     }
@@ -678,7 +682,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
         scope,
         "is-int",
         binary_func!(TypeCheckOperator("is-int", |x| match x {
-            RType::Atom(RAtom::Int(_)) => true,
+            RType::Atom(RAtom::Number(_)) => true,
             _ => false,
         }))
     );
@@ -767,15 +771,15 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                 }
                 Ok(RType::Atom(RAtom::String(result)))
             } else {
-                let mut result = 0;
+                let mut result = 0.0;
                 for x in xs {
-                    if let RType::Atom(RAtom::Int(x)) = x {
+                    if let RType::Atom(RAtom::Number(x)) = x {
                         result += x;
                     } else {
                         return Err(RError::Type(format!("`+` can not apply to {}", x)));
                     }
                 }
-                Ok(RType::Atom(RAtom::Int(result)))
+                Ok(RType::Atom(RAtom::Number(result)))
             }
         }))
     );
@@ -789,28 +793,28 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                     "`-` needs at least 1 value.",
                 ))),
                 1 => {
-                    if let RType::Atom(RAtom::Int(x)) = xs[0] {
-                        Ok(RType::Atom(RAtom::Int(-x)))
+                    if let RType::Atom(RAtom::Number(x)) = xs[0] {
+                        Ok(RType::Atom(RAtom::Number(-x)))
                     } else {
                         Err(RError::Type(format!("`-` can not apply to {}", xs[0])))
                     }
                 }
                 _ => {
-                    let mut result = if let RType::Atom(RAtom::Int(x)) = xs[0] {
+                    let mut result = if let RType::Atom(RAtom::Number(x)) = xs[0] {
                         x
                     } else {
                         return Err(RError::Type(format!("`-` can not apply to {}", xs[0])));
                     };
 
                     for x in &xs[1..] {
-                        if let RType::Atom(RAtom::Int(x)) = x {
+                        if let RType::Atom(RAtom::Number(x)) = x {
                             result -= *x;
                         } else {
                             return Err(RError::Type(format!("`-` can not apply to {}", x)));
                         }
                     }
 
-                    Ok(RType::Atom(RAtom::Int(result)))
+                    Ok(RType::Atom(RAtom::Number(result)))
                 }
             }
         }))
@@ -826,15 +830,15 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                 )));
             }
 
-            let mut result = 1;
+            let mut result = 1.0;
             for x in xs {
-                if let RType::Atom(RAtom::Int(x)) = x {
+                if let RType::Atom(RAtom::Number(x)) = x {
                     result *= x;
                 } else {
                     return Err(RError::Type(format!("`*` can not apply to {}", x)));
                 }
             }
-            Ok(RType::Atom(RAtom::Int(result)))
+            Ok(RType::Atom(RAtom::Number(result)))
         }))
     );
 
@@ -848,21 +852,21 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                 )));
             }
 
-            let mut result = if let RType::Atom(RAtom::Int(x)) = xs[0] {
+            let mut result = if let RType::Atom(RAtom::Number(x)) = xs[0] {
                 x
             } else {
                 return Err(RError::Type(format!("`/` can not apply to {}", xs[0])));
             };
 
             for x in &xs[1..] {
-                if let RType::Atom(RAtom::Int(x)) = x {
+                if let RType::Atom(RAtom::Number(x)) = x {
                     result /= *x;
                 } else {
                     return Err(RError::Type(format!("`/` can not apply to {}", x)));
                 }
             }
 
-            Ok(RType::Atom(RAtom::Int(result)))
+            Ok(RType::Atom(RAtom::Number(result)))
         }))
     );
 
@@ -910,10 +914,10 @@ mod test {
                 "(+)",
             );
 
-            assert_atom(RAtom::Int(1), "(+ 1)");
-            assert_atom(RAtom::Int(3), "(+ 1 2)");
-            assert_atom(RAtom::Int(15), "(+ 1 2 3 4 5)");
-            assert_atom(RAtom::Int(15), "(+ 1 (+ 2 3) 4 5)");
+            assert_atom(RAtom::Number(1.0), "(+ 1)");
+            assert_atom(RAtom::Number(3.0), "(+ 1 2)");
+            assert_atom(RAtom::Number(15.0), "(+ 1 2 3 4 5)");
+            assert_atom(RAtom::Number(15.0), "(+ 1 (+ 2 3) 4 5)");
 
             assert_atom(RAtom::String(String::from("hello")), r#"(+ "hello")"#);
             assert_atom(
@@ -941,10 +945,10 @@ mod test {
                 RError::Argument(String::from("`-` needs at least 1 value.")),
                 "(-)",
             );
-            assert_atom(RAtom::Int(-1), "(- 1)");
-            assert_atom(RAtom::Int(-1), "(- 1 2)");
-            assert_atom(RAtom::Int(-13), "(- 1 2 3 4 5)");
-            assert_atom(RAtom::Int(-7), "(- 1 (- 2 3) 4 5)");
+            assert_atom(RAtom::Number(-1.0), "(- 1)");
+            assert_atom(RAtom::Number(-1.0), "(- 1 2)");
+            assert_atom(RAtom::Number(-13.0), "(- 1 2 3 4 5)");
+            assert_atom(RAtom::Number(-7.0), "(- 1 (- 2 3) 4 5)");
         }
 
         #[test]
@@ -957,8 +961,8 @@ mod test {
                 RError::Argument(String::from("`*` needs at least 2 values.")),
                 "(* 1)",
             );
-            assert_atom(RAtom::Int(2), "(* 1 2)");
-            assert_atom(RAtom::Int(120), "(* 1 2 3 4 5)");
+            assert_atom(RAtom::Number(2.0), "(* 1 2)");
+            assert_atom(RAtom::Number(120.0), "(* 1 2 3 4 5)");
         }
 
         #[test]
@@ -971,21 +975,21 @@ mod test {
                 RError::Argument(String::from("`/` needs at least 2 values.")),
                 "(/ 1)",
             );
-            assert_atom(RAtom::Int(2), "(/ 4 2)");
-            assert_atom(RAtom::Int(5), "(/ 20 2 2)");
+            assert_atom(RAtom::Number(2.5), "(/ 5 2)");
+            assert_atom(RAtom::Number(5.0), "(/ 20 2 2)");
         }
     }
 
     #[test]
     fn def_and_set() {
-        assert_atom(RAtom::Int(42), "(def x 42) x");
-        assert_atom(RAtom::Int(3), "(def x (+ 1 2)) x");
+        assert_atom(RAtom::Number(42.0), "(def x 42) x");
+        assert_atom(RAtom::Number(3.0), "(def x (+ 1 2)) x");
 
         assert_err(
             RError::AlreadyExist(String::from("x")),
             "(def x 1) (def x 2)",
         );
-        assert_atom(RAtom::Int(2), "(def x 1) (set x 2) x");
+        assert_atom(RAtom::Number(2.0), "(def x 1) (set x 2) x");
         assert_err(RError::NotExist(String::from("x")), "(set x 3) x");
     }
 
@@ -997,7 +1001,7 @@ mod test {
         );
 
         assert_err(
-            RError::User(RType::Atom(RAtom::Int(123))),
+            RError::User(RType::Atom(RAtom::Number(123.0))),
             r#"(panic! 123)"#,
         );
 
