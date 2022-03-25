@@ -406,7 +406,7 @@ impl Callable for Seq {
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 1 && args.len() != 2 {
             return Err(RError::Argument(format!(
-                "`seq` needs 1 or 2 int argument but got {}",
+                "`seq` needs 1 or 2 number argument but got {}",
                 args
             )));
         }
@@ -420,7 +420,7 @@ impl Callable for Seq {
             RType::Atom(RAtom::Number(n)) => *n,
             x => {
                 return Err(RError::Argument(format!(
-                    "`seq` needs 1 or 2 int argument but got `{}`",
+                    "`seq` needs 1 or 2 number argument but got `{}`",
                     x
                 )))
             }
@@ -434,7 +434,7 @@ impl Callable for Seq {
                 RType::Atom(RAtom::Number(n)) => *n,
                 x => {
                     return Err(RError::Argument(format!(
-                        "`seq` needs 1 or 2 int argument but got `{}`",
+                        "`seq` needs 1 or 2 number argument but got `{}`",
                         x
                     )))
                 }
@@ -680,8 +680,8 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
 
     register!(
         scope,
-        "is-int",
-        binary_func!(TypeCheckOperator("is-int", |x| match x {
+        "is-number",
+        binary_func!(TypeCheckOperator("is-number", |x| match x {
             RType::Atom(RAtom::Number(_)) => true,
             _ => false,
         }))
