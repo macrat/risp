@@ -166,36 +166,24 @@ impl Parser {
 
             match c {
                 '(' if !self.builder.is_string() => {
-                    if let Err(err) = self.flush() {
-                        return Err(err);
-                    }
+                    self.flush()?;
                     self.stack.push(RList::empty(Some(self.position.clone())));
                 }
                 ')' if !self.builder.is_string() => {
-                    if let Err(err) = self.flush() {
-                        return Err(err);
-                    }
-                    self.pop_stack();
+                    self.flush()?;
+                    self.pop_stack()?;
                 }
                 ' ' | '\t' if !self.builder.is_string() => {
-                    if let Err(err) = self.flush() {
-                        return Err(err);
-                    }
+                    self.flush()?;
                 }
                 '\r' | '\n' => {
-                    if let Err(err) = self.flush() {
-                        return Err(err);
+                    self.flush()?;
+                }
+                _ => {
+                    if self.builder.push(c)? {
+                        self.flush()?;
                     }
                 }
-                _ => match self.builder.push(c) {
-                    Ok(true) => {
-                        if let Err(err) = self.flush() {
-                            return Err(err);
-                        }
-                    }
-                    Ok(false) => {}
-                    Err(err) => return Err(err),
-                },
             }
         }
         Ok(())
@@ -225,9 +213,12 @@ impl Parser {
         }
     }
 
-    fn pop_stack(&mut self) {
+    fn pop_stack(&mut self) -> Result<(), RError> {
         if let Some(top) = self.stack.pop() {
             self.push_stack(RType::List(top));
+            Ok(())
+        } else {
+            Err(RError::Incompleted(String::new()))
         }
     }
 
@@ -267,13 +258,9 @@ pub mod test {
     pub fn parse(text: &str) -> Result<RList, RError> {
         let mut p = Parser::new("<test>".into());
 
-        if let Err(err) = p.feed(text) {
-            return Err(err);
-        }
+        p.feed(text)?;
 
-        if let Err(err) = p.close() {
-            return Err(err);
-        }
+        p.close()?;
 
         Ok(RList::new(p.queue.into(), None))
     }
@@ -332,5 +319,11 @@ pub mod test {
             RError::Incompleted(String::from("hello\"  ")),
             r#"  "hello\"  "#,
         );
+    }
+
+    #[test]
+    fn list() {
+        assert_err(RError::Incompleted(String::new()), r#"  ("hello"  "#);
+        assert_err(RError::Incompleted(String::new()), r#"  123)  "#);
     }
 }

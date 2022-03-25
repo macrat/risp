@@ -30,9 +30,9 @@ impl fmt::Display for RError {
         match self {
             RError::Type(reason) => write!(f, "TypeError: {}", reason),
             RError::AlreadyExist(name) => {
-                write!(f, "AlreadyExistError: `{}` is already exist.", name)
+                write!(f, "AlreadyExistError: {} is already exist.", name)
             }
-            RError::NotExist(name) => write!(f, "NotExistError: `{}` does not exist.", name),
+            RError::NotExist(name) => write!(f, "NotExistError: {} does not exist.", name),
             RError::Argument(reason) => write!(f, "ArgumentError: {}", reason),
             RError::Incompleted(buf) => {
                 write!(
@@ -43,12 +43,12 @@ impl fmt::Display for RError {
             }
             RError::InvalidLiteral(literal) => write!(
                 f,
-                "InvalidLiteralError: `{}...` is invalid literal.",
+                "InvalidLiteralError: {}... is invalid literal.",
                 escape_string(literal),
             ),
             RError::InvalidEscape(c) => write!(
                 f,
-                "InvalidEscapeError: `\\{}` is invalid escape in string.",
+                r#"InvalidEscapeError: "\{}" is invalid escape in string."#,
                 c
             ),
             RError::IO(reason) => write!(f, "IOError: {}", reason),
