@@ -352,7 +352,11 @@ impl fmt::Display for RFunc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             RFunc::Pure { args, body, .. } => {
-                write!(f, "(func ({}) {})", args.join(" "), body.to_bare_string())
+                if body.len() > 0 {
+                    write!(f, "(func ({}) {})", args.join(" "), body.to_bare_string())
+                } else {
+                    write!(f, "(func ({}))", args.join(" "))
+                }
             }
             RFunc::Binary(c) => write!(f, "{}", *c),
         }

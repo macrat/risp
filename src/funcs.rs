@@ -14,6 +14,12 @@ impl Callable for Func {
     }
 
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+        if args.len() == 0 {
+            return Err(RError::Argument(
+                "`func` needs at least 1 argument but got no argument.".into(),
+            ));
+        }
+
         Ok(RType::Func(Rc::new(RFunc::Pure {
             args: match &args[0] {
                 RType::List(list) => {
