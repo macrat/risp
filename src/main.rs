@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::rc::Rc;
 
 mod env;
 mod funcs;
@@ -12,24 +11,24 @@ mod test;
 
 fn compute(
     env: &mut env::Env,
-    scope: &Rc<scope::Scope>,
+    scope: &scope::Scope,
     parser: &mut parser::Parser,
     show_prompt: bool,
 ) {
     loop {
-        env.reset_trace();
-
         match parser.pop() {
             Some(expr) => match expr.compute(env, scope) {
-                Ok(result) if !result.is_nil() && show_prompt => println!("< {}", result),
-                Ok(_) => {}
-                Err(err) if show_prompt => {
-                    env.trace.print(err);
+                Ok(result) => {
+                    if !result.is_nil() && show_prompt {
+                        println!("< {}", result)
+                    }
                 }
                 Err(err) => {
-                    println!("> {}", expr);
                     env.trace.print(err);
-                    std::process::exit(1);
+                    if !show_prompt {
+                        std::process::exit(1);
+                    }
+                    env.trace.clear();
                 }
             },
             None => {
@@ -44,7 +43,7 @@ fn compute(
 
 fn main() {
     let mut env = env::Env::new();
-    let scope = Rc::new(scope::Scope::new());
+    let scope = scope::Scope::new();
     if let Err(err) = funcs::register_to(&scope) {
         println!("failed to load embedded functions: {}", err);
         std::process::exit(-1);

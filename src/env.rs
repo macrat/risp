@@ -32,8 +32,4 @@ impl Env {
         self.modules.set(name, module.clone())?;
         Ok(module)
     }
-
-    pub fn reset_trace(&mut self) {
-        self.trace.clear()
-    }
 }
