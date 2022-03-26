@@ -1,11 +1,11 @@
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::convert::From;
 use std::fmt;
 use std::ops::{Index, RangeFrom};
 use std::rc::Rc;
 
-use crate::context::{scope::Scope, trace::Position, Context};
+use crate::env::{trace::Position, Env};
+use crate::scope::Scope;
 
 #[derive(Debug, PartialEq)]
 pub enum RError {
@@ -17,7 +17,7 @@ pub enum RError {
     InvalidLiteral(String),
     InvalidEscape(char),
     IO(String),
-    User(RType),
+    User(RValue),
 }
 
 fn escape_string(s: &String) -> String {
@@ -65,13 +65,10 @@ pub enum RAtom {
 }
 
 impl RAtom {
-    fn compute(&self, ctx: &mut Context) -> Result<RType, RError> {
+    fn compute(&self, _: &mut Env, scope: &Scope) -> Result<RValue, RError> {
         match self {
-            RAtom::Symbol(name) => match ctx.get_value(name) {
-                Some(val) => Ok((*val).clone()),
-                None => Err(RError::NotExist(name.to_string())),
-            },
-            _ => Ok(RType::Atom(self.clone())),
+            RAtom::Symbol(name) => scope.get(name),
+            _ => Ok(RValue::Atom(self.clone())),
         }
     }
 
@@ -103,14 +100,14 @@ impl fmt::Display for RAtom {
 }
 
 #[derive(Debug)]
-pub struct RList(Vec<RType>, Option<Position>);
+pub struct RList(Vec<RValue>, Option<Position>);
 
 impl RList {
-    pub fn new(items: Vec<RType>, pos: Option<Position>) -> RList {
+    pub fn new(items: Vec<RValue>, pos: Option<Position>) -> RList {
         RList(items, pos)
     }
 
-    pub fn from(items: &[RType], pos: Option<Position>) -> RList {
+    pub fn from(items: &[RValue], pos: Option<Position>) -> RList {
         RList::new(items.to_vec(), pos)
     }
 
@@ -118,35 +115,37 @@ impl RList {
         RList::new(Vec::new(), pos)
     }
 
-    pub fn push(&mut self, val: RType) {
+    pub fn push(&mut self, val: RValue) {
         self.0.push(val)
     }
 
-    pub fn compute(&self, ctx: &mut Context) -> Result<RType, RError> {
+    pub fn compute(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
         if self.0.len() == 0 {
-            return Ok(RType::nil());
+            return Ok(RValue::nil());
         }
 
-        ctx.trace().borrow_mut().push(self.clone());
-        match self.0[0].compute(ctx) {
+        env.trace.push(self.clone());
+        match self.0[0].compute(env, scope) {
             Ok(first) => match &first {
-                RType::Func(func) => match func.call(ctx, RList::from(&self.0[1..], None)) {
-                    Ok(x) => {
-                        ctx.trace().borrow_mut().pop();
-                        Ok(x)
+                RValue::Func(func) => {
+                    match func.call(env, scope, RList::from(&self.0[1..], None)) {
+                        Ok(x) => {
+                            env.trace.pop();
+                            Ok(x)
+                        }
+                        Err(err) => Err(err),
                     }
-                    Err(err) => Err(err),
-                },
+                }
                 _ => Err(RError::Type(format!("`{}` is not a function.", first))),
             },
             Err(err) => Err(err),
         }
     }
 
-    pub fn compute_last(&self, ctx: &mut Context) -> Result<RType, RError> {
-        let mut result = RType::nil();
+    pub fn compute_last(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
+        let mut result = RValue::nil();
         for x in &self.0 {
-            match x.compute(ctx) {
+            match x.compute(env, scope) {
                 Ok(x) => {
                     result = x;
                 }
@@ -156,10 +155,10 @@ impl RList {
         Ok(result)
     }
 
-    pub fn compute_each(&self, ctx: &mut Context) -> Result<RList, RError> {
+    pub fn compute_each(&self, env: &mut Env, scope: &Scope) -> Result<RList, RError> {
         let mut result = RList::empty(None);
         for x in &self.0 {
-            match x.compute(ctx) {
+            match x.compute(env, scope) {
                 Ok(x) => result.push(x),
                 Err(err) => return Err(err),
             }
@@ -191,7 +190,7 @@ impl RList {
         self.0.len()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<RType> {
+    pub fn iter(&self) -> std::slice::Iter<RValue> {
         self.0.iter()
     }
 
@@ -251,7 +250,7 @@ impl std::cmp::PartialEq for RList {
 }
 
 impl Index<usize> for RList {
-    type Output = RType;
+    type Output = RValue;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
@@ -259,7 +258,7 @@ impl Index<usize> for RList {
 }
 
 impl Index<RangeFrom<usize>> for RList {
-    type Output = [RType];
+    type Output = [RValue];
 
     fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
         &self.0[index]
@@ -269,7 +268,7 @@ impl Index<RangeFrom<usize>> for RList {
 pub trait Callable {
     fn name(&self) -> &str;
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError>;
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError>;
 }
 
 impl fmt::Display for dyn Callable {
@@ -289,7 +288,7 @@ pub enum RFunc {
     Pure {
         args: Vec<String>,
         body: RList,
-        capture: Rc<RefCell<Scope>>,
+        capture: Scope,
     },
     Binary(Box<dyn Callable>),
 }
@@ -308,7 +307,7 @@ impl Callable for RFunc {
         }
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         match self {
             RFunc::Pure {
                 args: arg_names,
@@ -323,27 +322,14 @@ impl Callable for RFunc {
                     )));
                 }
 
-                let local = Scope::child(capture);
+                let local = capture.child();
                 for (name, value) in arg_names.iter().zip(args.0) {
-                    match value.compute(ctx) {
-                        Ok(value) => {
-                            if let Err(err) = local
-                                .borrow_mut()
-                                .define(String::from(name), Rc::new(value))
-                            {
-                                return Err(err);
-                            }
-                        }
-                        Err(err) => return Err(err),
-                    }
+                    local.define(String::from(name), value.compute(env, scope)?)?;
                 }
 
-                match body.compute_last(&mut ctx.overload(local)) {
-                    Ok(result) => Ok(result),
-                    Err(err) => Err(err),
-                }
+                body.compute_last(env, &local)
             }
-            RFunc::Binary(c) => c.call(ctx, args),
+            RFunc::Binary(c) => c.call(env, scope, args),
         }
     }
 }
@@ -364,35 +350,35 @@ impl fmt::Display for RFunc {
 }
 
 #[derive(Debug)]
-pub enum RType {
+pub enum RValue {
     Atom(RAtom),
     List(RList),
     Func(Rc<RFunc>),
 }
 
-impl RType {
-    pub fn nil() -> RType {
-        RType::List(RList::empty(None))
+impl RValue {
+    pub fn nil() -> RValue {
+        RValue::List(RList::empty(None))
     }
 
-    pub fn compute(&self, ctx: &mut Context) -> Result<RType, RError> {
+    pub fn compute(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
         match self {
-            RType::Atom(atom) => atom.compute(ctx),
-            RType::List(list) => list.compute(ctx),
-            RType::Func(func) => Ok(RType::Func(Rc::clone(func))),
+            RValue::Atom(atom) => atom.compute(env, scope),
+            RValue::List(list) => list.compute(env, scope),
+            RValue::Func(func) => Ok(RValue::Func(Rc::clone(func))),
         }
     }
 
     pub fn is_nil(&self) -> bool {
         match self {
-            RType::List(list) if list.0.len() == 0 => true,
+            RValue::List(list) if list.0.len() == 0 => true,
             _ => false,
         }
     }
 
-    pub fn cmp(&self, other: &RType) -> Result<Ordering, RError> {
+    pub fn cmp(&self, other: &RValue) -> Result<Ordering, RError> {
         match (self, other) {
-            (RType::Atom(RAtom::Number(x)), RType::Atom(RAtom::Number(y))) => {
+            (RValue::Atom(RAtom::Number(x)), RValue::Atom(RAtom::Number(y))) => {
                 if let Some(ord) = x.partial_cmp(y) {
                     Ok(ord)
                 } else {
@@ -402,8 +388,8 @@ impl RType {
                     )))
                 }
             }
-            (RType::Atom(RAtom::String(x)), RType::Atom(RAtom::String(y))) => Ok(x.cmp(y)),
-            (RType::List(x), RType::List(y)) => x.cmp(y),
+            (RValue::Atom(RAtom::String(x)), RValue::Atom(RAtom::String(y))) => Ok(x.cmp(y)),
+            (RValue::List(x), RValue::List(y)) => x.cmp(y),
             (_, _) => Err(RError::Type(format!(
                 "`{}` and `{}` are not comparable.",
                 self, other
@@ -413,47 +399,47 @@ impl RType {
 
     pub fn as_bool(&self) -> bool {
         match self {
-            RType::Atom(atom) => atom.as_bool(),
-            RType::List(list) => list.as_bool(),
-            RType::Func(_) => true,
+            RValue::Atom(atom) => atom.as_bool(),
+            RValue::List(list) => list.as_bool(),
+            RValue::Func(_) => true,
         }
     }
 
     pub fn to_printable(&self) -> String {
         match self {
-            RType::Atom(atom) => atom.to_printable(),
-            RType::List(list) => list.to_printable(),
-            RType::Func(func) => func.to_printable(),
+            RValue::Atom(atom) => atom.to_printable(),
+            RValue::List(list) => list.to_printable(),
+            RValue::Func(func) => func.to_printable(),
         }
     }
 }
 
-impl fmt::Display for RType {
+impl fmt::Display for RValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RType::Atom(atom) => atom.fmt(f),
-            RType::List(list) => list.fmt(f),
-            RType::Func(func) => func.fmt(f),
+            RValue::Atom(atom) => atom.fmt(f),
+            RValue::List(list) => list.fmt(f),
+            RValue::Func(func) => func.fmt(f),
         }
     }
 }
 
-impl Clone for RType {
-    fn clone(&self) -> RType {
+impl Clone for RValue {
+    fn clone(&self) -> RValue {
         match self {
-            RType::Atom(atom) => RType::Atom(atom.clone()),
-            RType::List(list) => RType::List(list.clone()),
-            RType::Func(func) => RType::Func(Rc::clone(func)),
+            RValue::Atom(atom) => RValue::Atom(atom.clone()),
+            RValue::List(list) => RValue::List(list.clone()),
+            RValue::Func(func) => RValue::Func(Rc::clone(func)),
         }
     }
 }
 
-impl std::cmp::PartialEq for RType {
+impl std::cmp::PartialEq for RValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (RType::Atom(a), RType::Atom(b)) => a == b,
-            (RType::List(a), RType::List(b)) => a == b,
-            (RType::Func(a), RType::Func(b)) => Rc::ptr_eq(a, b),
+            (RValue::Atom(a), RValue::Atom(b)) => a == b,
+            (RValue::List(a), RValue::List(b)) => a == b,
+            (RValue::Func(a), RValue::Func(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }

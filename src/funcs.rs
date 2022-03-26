@@ -2,7 +2,8 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::context::{self, Context};
+use crate::env::Env;
+use crate::scope::Scope;
 use crate::types::*;
 
 #[derive(Debug)]
@@ -13,19 +14,19 @@ impl Callable for Func {
         "func"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, _: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() == 0 {
             return Err(RError::Argument(
                 "`func` needs at least 1 argument but got no argument.".into(),
             ));
         }
 
-        Ok(RType::Func(Rc::new(RFunc::Pure {
+        Ok(RValue::Func(Rc::new(RFunc::Pure {
             args: match &args[0] {
-                RType::List(list) => {
+                RValue::List(list) => {
                     let mut symbols: Vec<String> = Vec::new();
                     for x in list.iter() {
-                        if let RType::Atom(RAtom::Symbol(name)) = x {
+                        if let RValue::Atom(RAtom::Symbol(name)) = x {
                             symbols.push(String::from(name))
                         } else {
                             return Err(RError::Type(String::from(
@@ -42,7 +43,7 @@ impl Callable for Func {
                 }
             },
             body: RList::from(&args[1..], None),
-            capture: ctx.scope(),
+            capture: scope.clone(),
         })))
     }
 }
@@ -61,7 +62,7 @@ impl Callable for Def {
         "def"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`def` needs exact 2 arguments but got `{}`.",
@@ -69,17 +70,11 @@ impl Callable for Def {
             )));
         }
 
-        let value = match args[1].compute(ctx) {
-            Ok(x) => x,
-            Err(err) => return Err(err),
-        };
+        let value = args[1].compute(env, scope)?;
 
-        if let RType::Atom(RAtom::Symbol(name)) = &args[0] {
-            if let Err(err) = ctx.define_value(String::from(name), Rc::new(value.clone())) {
-                Err(err)
-            } else {
-                Ok(value)
-            }
+        if let RValue::Atom(RAtom::Symbol(name)) = &args[0] {
+            scope.define(String::from(name), value.clone())?;
+            Ok(value)
         } else {
             Err(RError::Type(format!(
                 "first argument of `def` should be a symbol."
@@ -96,18 +91,12 @@ impl Callable for Set {
         "set"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        let value = match args[1].compute(ctx) {
-            Ok(x) => x,
-            Err(err) => return Err(err),
-        };
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let value = args[1].compute(env, scope)?;
 
-        if let RType::Atom(RAtom::Symbol(name)) = &args[0] {
-            if let Err(err) = ctx.set_value(String::from(name), Rc::new(value.clone())) {
-                Err(err)
-            } else {
-                Ok(value)
-            }
+        if let RValue::Atom(RAtom::Symbol(name)) = &args[0] {
+            scope.set(String::from(name), value.clone())?;
+            Ok(value)
         } else {
             Err(RError::Type(format!(
                 "first argument of `set` should be a symbol."
@@ -124,7 +113,7 @@ impl Callable for Import {
         "import"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
             return Err(RError::Argument(format!(
                 "`import` needs exact 1 argument but got `{}`.",
@@ -132,18 +121,17 @@ impl Callable for Import {
             )));
         }
 
-        let name = match args[0].compute(ctx) {
-            Ok(RType::Atom(RAtom::String(x))) => x,
-            Ok(x) => {
+        let name = match args[0].compute(env, scope)? {
+            RValue::Atom(RAtom::String(x)) => x,
+            x => {
                 return Err(RError::Type(format!(
                     "`import` needs a string as argument but got `{}`.",
                     x
                 )))
             }
-            Err(err) => return Err(err),
         };
 
-        ctx.load(name)
+        env.load(scope, name)
     }
 }
 
@@ -155,14 +143,10 @@ impl Callable for Print<'_> {
         self.0
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        match args.compute_each(ctx) {
-            Ok(x) => {
-                print!("{}{}", x.to_bare_printable(), self.1);
-                Ok(RType::nil())
-            }
-            Err(err) => Err(err),
-        }
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let xs = args.compute_each(env, scope)?;
+        print!("{}{}", xs.to_bare_printable(), self.1);
+        Ok(RValue::nil())
     }
 }
 
@@ -174,16 +158,13 @@ impl Callable for Panic {
         "panic!"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         match args.len() {
-            0 => Err(RError::User(RType::nil())),
-            1 => match args[0].compute(ctx) {
-                Ok(x) => Err(RError::User(x)),
-                Err(err) => Err(err),
-            },
+            0 => Err(RError::User(RValue::nil())),
+            1 => Err(RError::User(args[0].compute(env, scope)?)),
             _ => Err(RError::Argument(format!(
                 "`panic!` needs 0 or 1 argument but got {}",
-                args
+                args,
             ))),
         }
     }
@@ -197,25 +178,22 @@ impl Callable for If {
         "if"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 && args.len() != 3 {
             return Err(RError::Argument(format!(
                 "`if` requires 2 or 3 arguments but got {} arguments.",
-                args.len()
+                args.len(),
             )));
         }
 
-        let cond = match args[0].compute(ctx) {
-            Ok(val) => val.as_bool(),
-            Err(err) => return Err(err),
-        };
+        let cond = args[0].compute(env, scope)?.as_bool();
 
         if cond {
-            args[1].compute(ctx)
+            args[1].compute(env, scope)
         } else if args.len() == 3 {
-            args[2].compute(ctx)
+            args[2].compute(env, scope)
         } else {
-            Ok(RType::nil())
+            Ok(RValue::nil())
         }
     }
 }
@@ -228,8 +206,8 @@ impl Callable for Do {
         "do"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        args.compute_last(&mut ctx.child())
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        args.compute_last(env, &Rc::new(scope.child()))
     }
 }
 
@@ -241,30 +219,23 @@ impl Callable for While {
         "while"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() == 0 {
             return Err(RError::Argument(format!(
                 "`while` needs 1 or more arguments but got {}.",
-                args
+                args,
             )));
         }
 
-        let mut local = ctx.child();
-        let mut result = RType::nil();
+        let local = Rc::new(scope.child());
+        let mut result = RValue::nil();
 
         loop {
-            let cond = match args[0].compute(ctx) {
-                Ok(val) => val,
-                Err(err) => return Err(err),
-            };
-            if !cond.as_bool() {
+            if !args[0].compute(env, scope)?.as_bool() {
                 break;
             }
 
-            result = match RList::from(&args[1..], None).compute_last(&mut local) {
-                Ok(val) => val,
-                Err(err) => return Err(err),
-            }
+            result = RList::from(&args[1..], None).compute_last(env, &local)?;
         }
 
         Ok(result)
@@ -279,7 +250,7 @@ impl Callable for Map {
         "map"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`map` needs exact 2 arguments but got {}.",
@@ -287,38 +258,33 @@ impl Callable for Map {
             )));
         }
 
-        let list = match args[0].compute(ctx) {
-            Ok(RType::List(xs)) => xs,
-            Ok(x) => {
+        let list = match args[0].compute(env, scope)? {
+            RValue::List(xs) => xs,
+            x => {
                 return Err(RError::Type(format!(
                     "the first argument of `map` must be a list, but got `{}`.",
                     x
                 )))
             }
-            Err(err) => return Err(err),
         };
 
-        let func = match args[1].compute(ctx) {
-            Ok(RType::Func(f)) => f,
-            Ok(x) => {
+        let func = match args[1].compute(env, scope)? {
+            RValue::Func(f) => f,
+            x => {
                 return Err(RError::Type(format!(
                     "the second argument of `map` must be a function, but got `{}`.",
                     x
                 )))
             }
-            Err(err) => return Err(err),
         };
 
         let mut result = RList::empty(None);
 
         for x in list.iter() {
-            match func.call(ctx, RList::new(vec![x.clone()], None)) {
-                Ok(x) => result.push(x),
-                Err(err) => return Err(err),
-            }
+            result.push(func.call(env, scope, RList::new(vec![x.clone()], None))?);
         }
 
-        Ok(RType::List(result))
+        Ok(RValue::List(result))
     }
 }
 
@@ -330,7 +296,7 @@ impl Callable for Fold {
         "fold"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`fold` needs exact 2 arguments but got {}.",
@@ -338,41 +304,36 @@ impl Callable for Fold {
             )));
         }
 
-        let list = match args[0].compute(ctx) {
-            Ok(RType::List(xs)) if xs.len() >= 2 => xs,
-            Ok(RType::List(xs)) => {
+        let list = match args[0].compute(env, scope)? {
+            RValue::List(xs) if xs.len() >= 2 => xs,
+            RValue::List(xs) => {
                 return Err(RError::Type(format!(
                     "the first argument of `fold` must be longer than 2, but got `{}`.",
                     xs
                 )))
             }
-            Ok(x) => {
+            x => {
                 return Err(RError::Type(format!(
                     "the first argument of `fold` must be a list, but got `{}`.",
                     x
                 )))
             }
-            Err(err) => return Err(err),
         };
 
-        let func = match args[1].compute(ctx) {
-            Ok(RType::Func(f)) => f,
-            Ok(x) => {
+        let func = match args[1].compute(env, scope)? {
+            RValue::Func(f) => f,
+            x => {
                 return Err(RError::Type(format!(
                     "the second argument of `fold` must be a function, but got `{}`.",
                     x
                 )))
             }
-            Err(err) => return Err(err),
         };
 
         let mut result = list[0].clone();
 
         for x in &list[1..] {
-            match func.call(ctx, RList::new(vec![result, x.clone()], None)) {
-                Ok(x) => result = x,
-                Err(err) => return Err(err),
-            }
+            result = func.call(env, scope, RList::new(vec![result, x.clone()], None))?;
         }
 
         Ok(result)
@@ -387,11 +348,8 @@ impl Callable for List {
         "list"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        match args.compute_each(ctx) {
-            Ok(list) => Ok(RType::List(list)),
-            Err(err) => Err(err),
-        }
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        Ok(RValue::List(args.compute_each(env, scope)?))
     }
 }
 
@@ -403,7 +361,7 @@ impl Callable for Seq {
         "seq"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 && args.len() != 2 {
             return Err(RError::Argument(format!(
                 "`seq` needs 1 or 2 number argument but got {}",
@@ -411,13 +369,10 @@ impl Callable for Seq {
             )));
         }
 
-        let args = match args.compute_each(ctx) {
-            Ok(xs) => xs,
-            Err(err) => return Err(err),
-        };
+        let args = args.compute_each(env, scope)?;
 
         let to = match &args[args.len() - 1] {
-            RType::Atom(RAtom::Number(n)) => *n,
+            RValue::Atom(RAtom::Number(n)) => *n,
             x => {
                 return Err(RError::Argument(format!(
                     "`seq` needs 1 or 2 number argument but got `{}`",
@@ -426,12 +381,12 @@ impl Callable for Seq {
             }
         };
         if args.len() == 1 && to == 0.0 {
-            return Ok(RType::nil());
+            return Ok(RValue::nil());
         }
 
         let from = if args.len() == 2 {
             match &args[0] {
-                RType::Atom(RAtom::Number(n)) => *n,
+                RValue::Atom(RAtom::Number(n)) => *n,
                 x => {
                     return Err(RError::Argument(format!(
                         "`seq` needs 1 or 2 number argument but got `{}`",
@@ -450,11 +405,11 @@ impl Callable for Seq {
         let mut result = RList::empty(None);
         let mut i = from;
         while i != to {
-            result.push(RType::Atom(RAtom::Number(i)));
+            result.push(RValue::Atom(RAtom::Number(i)));
             i += step;
         }
-        result.push(RType::Atom(RAtom::Number(i)));
-        Ok(RType::List(result))
+        result.push(RValue::Atom(RAtom::Number(i)));
+        Ok(RValue::List(result))
     }
 }
 
@@ -466,24 +421,23 @@ impl Callable for Car {
         "car"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
             Err(RError::Argument(format!(
                 "`car` needs exact 1 argument but got {} arguments",
-                args.len()
+                args.len(),
             )))
         } else {
-            match args[0].compute(ctx) {
-                Ok(RType::List(list)) => Ok(list[0].clone()),
-                Ok(RType::Atom(RAtom::String(x))) => match x.chars().next() {
-                    Some(c) => Ok(RType::Atom(RAtom::String(c.into()))),
-                    None => Ok(RType::Atom(RAtom::String(String::new()))),
+            match args[0].compute(env, scope)? {
+                RValue::List(list) => Ok(list[0].clone()),
+                RValue::Atom(RAtom::String(x)) => match x.chars().next() {
+                    Some(c) => Ok(RValue::Atom(RAtom::String(c.into()))),
+                    None => Ok(RValue::Atom(RAtom::String(String::new()))),
                 },
-                Ok(x) => Err(RError::Type(format!(
+                x => Err(RError::Type(format!(
                     "`car` needs list or string but got {}",
-                    x
+                    x,
                 ))),
-                Err(err) => Err(err),
             }
         }
     }
@@ -497,121 +451,89 @@ impl Callable for Cdr {
         "cdr"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
             Err(RError::Argument(format!(
                 "`cdr` needs exact 1 argument but got {} arguments",
-                args.len()
+                args.len(),
             )))
         } else {
-            match args[0].compute(ctx) {
-                Ok(RType::List(list)) => Ok(RType::List(RList::from(&list[1..], None))),
-                Ok(RType::Atom(RAtom::String(x))) => {
+            match args[0].compute(env, scope)? {
+                RValue::List(list) => Ok(RValue::List(RList::from(&list[1..], None))),
+                RValue::Atom(RAtom::String(x)) => {
                     let mut chars = x.chars();
                     chars.next();
-                    Ok(RType::Atom(RAtom::String(chars.as_str().into())))
+                    Ok(RValue::Atom(RAtom::String(chars.as_str().into())))
                 }
-                Ok(x) => Err(RError::Type(format!(
+                x => Err(RError::Type(format!(
                     "`cdr` needs list or string but got {}",
-                    x
+                    x,
                 ))),
-                Err(err) => Err(err),
             }
         }
     }
 }
 
 #[derive(Debug)]
-struct CalculateOperator<'a>(&'a str, fn(Vec<RType>) -> Result<RType, RError>);
+struct CalculateOperator<'a>(&'a str, fn(Vec<RValue>) -> Result<RValue, RError>);
 
 impl Callable for CalculateOperator<'_> {
     fn name(&self) -> &str {
         self.0
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
-        let mut xs: Vec<RType> = Vec::new();
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let mut xs: Vec<RValue> = Vec::new();
         for x in args.iter() {
-            match x.compute(ctx) {
-                Ok(x) => xs.push(x),
-                Err(err) => return Err(err),
-            }
+            xs.push(x.compute(env, scope)?);
         }
         self.1(xs)
     }
 }
 
-struct CompareOperator<'a>(&'a str, fn(&RType, &RType) -> Result<bool, RError>);
+struct CompareOperator<'a>(&'a str, fn(&RValue, &RValue) -> Result<bool, RError>);
 
 impl Callable for CompareOperator<'_> {
     fn name(&self) -> &str {
         self.0
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() < 2 {
             return Err(RError::Argument(format!(
                 "`{}` needs at least 2 values.",
-                self.0
+                self.0,
             )));
         }
 
-        let mut x = match args[0].compute(ctx) {
-            Ok(x) => x,
-            Err(err) => return Err(err),
-        };
+        let mut x = args[0].compute(env, scope)?;
 
         for y in &args[1..] {
-            match y.compute(ctx) {
-                Ok(y) => {
-                    match self.1(&x, &y) {
-                        Ok(false) => return Ok(RType::Atom(RAtom::Number(0.0))),
-                        Err(err) => return Err(err),
-                        _ => {}
-                    }
-                    x = y;
-                }
-                Err(err) => return Err(err),
+            let y = y.compute(env, scope)?;
+            if !self.1(&x, &y)? {
+                return Ok(RValue::Atom(RAtom::Number(0.0)));
             }
+            x = y;
         }
 
-        Ok(RType::Atom(RAtom::Number(1.0)))
+        Ok(RValue::Atom(RAtom::Number(1.0)))
     }
 }
 
-macro_rules! ordering_rule {
-    ($order:expr, true) => {
-        |x, y| match x.cmp(y) {
-            Ok(order) => Ok(order == $order),
-            Err(err) => Err(err),
-        }
-    };
-    ($order:expr, false) => {
-        |x, y| match x.cmp(y) {
-            Ok(order) => Ok(order != $order),
-            Err(err) => Err(err),
-        }
-    };
-}
-
-struct TypeCheckOperator<'a>(&'a str, fn(&RType) -> bool);
+struct TypeCheckOperator<'a>(&'a str, fn(&RValue) -> bool);
 
 impl Callable for TypeCheckOperator<'_> {
     fn name(&self) -> &str {
         self.0
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         for x in args.iter() {
-            match x.compute(ctx) {
-                Ok(x) if self.1(&x) => {
-                    return Ok(RType::Atom(RAtom::Number(1.0)));
-                }
-                Err(err) => return Err(err),
-                _ => {}
+            if !self.1(&x.compute(env, scope)?) {
+                return Ok(RValue::Atom(RAtom::Number(0.0)));
             }
         }
-        Ok(RType::Atom(RAtom::Number(0.0)))
+        Ok(RValue::Atom(RAtom::Number(1.0)))
     }
 }
 
@@ -623,7 +545,7 @@ impl Callable for NotOperator {
         "not"
     }
 
-    fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
             return Err(RError::Argument(format!(
                 "`not` needs exact 1 argument but got `{}`.",
@@ -631,20 +553,18 @@ impl Callable for NotOperator {
             )));
         }
 
-        match args[0].compute(ctx) {
-            Ok(x) => Ok(RType::Atom(RAtom::Number(if x.as_bool() {
-                0.0
-            } else {
-                1.0
-            }))),
-            Err(err) => Err(err),
-        }
+        let result = if args[0].compute(env, scope)?.as_bool() {
+            0.0
+        } else {
+            1.0
+        };
+        Ok(RValue::Atom(RAtom::Number(result)))
     }
 }
 
 macro_rules! binary_func {
     ($func:expr) => {
-        Rc::new(RType::Func(Rc::new(RFunc::Binary(Box::new($func)))))
+        RValue::Func(Rc::new(RFunc::Binary(Box::new($func))))
     };
 }
 
@@ -656,7 +576,7 @@ macro_rules! register {
     };
 }
 
-pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
+pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "def", binary_func!(Def));
     register!(scope, "set", binary_func!(Set));
     register!(scope, "import", binary_func!(Import));
@@ -682,7 +602,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
         scope,
         "is-number",
         binary_func!(TypeCheckOperator("is-number", |x| match x {
-            RType::Atom(RAtom::Number(_)) => true,
+            RValue::Atom(RAtom::Number(_)) => true,
             _ => false,
         }))
     );
@@ -690,7 +610,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
         scope,
         "is-string",
         binary_func!(TypeCheckOperator("is-string", |x| match x {
-            RType::Atom(RAtom::String(_)) => true,
+            RValue::Atom(RAtom::String(_)) => true,
             _ => false,
         }))
     );
@@ -698,7 +618,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
         scope,
         "is-list",
         binary_func!(TypeCheckOperator("is-list", |x| match x {
-            RType::List(_) => true,
+            RValue::List(_) => true,
             _ => false,
         }))
     );
@@ -706,7 +626,7 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
         scope,
         "is-func",
         binary_func!(TypeCheckOperator("is-func", |x| match x {
-            RType::Func(_) => true,
+            RValue::Func(_) => true,
             _ => false,
         }))
     );
@@ -726,28 +646,29 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
     register!(
         scope,
         "<",
-        binary_func!(CompareOperator("<", ordering_rule!(Ordering::Less, true)))
+        binary_func!(CompareOperator("<", |x, y| Ok(x.cmp(y)? == Ordering::Less)))
     );
     register!(
         scope,
         ">",
-        binary_func!(CompareOperator(
-            ">",
-            ordering_rule!(Ordering::Greater, true)
-        ))
+        binary_func!(CompareOperator(">", |x, y| Ok(
+            x.cmp(y)? == Ordering::Greater
+        ),))
     );
     register!(
         scope,
         "<=",
-        binary_func!(CompareOperator(
-            "<=",
-            ordering_rule!(Ordering::Greater, false)
-        ))
+        binary_func!(CompareOperator("<=", |x, y| Ok(
+            x.cmp(y)? != Ordering::Greater
+        ),))
     );
     register!(
         scope,
         ">=",
-        binary_func!(CompareOperator(">=", ordering_rule!(Ordering::Less, false)))
+        binary_func!(CompareOperator(
+            ">=",
+            |x, y| Ok(x.cmp(y)? != Ordering::Less)
+        ))
     );
 
     register!(
@@ -760,26 +681,26 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                 )));
             }
 
-            if let RType::Atom(RAtom::String(_)) = xs[0] {
+            if let RValue::Atom(RAtom::String(_)) = xs[0] {
                 let mut result = String::new();
                 for x in xs {
-                    if let RType::Atom(RAtom::String(x)) = x {
+                    if let RValue::Atom(RAtom::String(x)) = x {
                         result += &x;
                     } else {
                         return Err(RError::Type(format!("`+` can not apply to {}", x)));
                     }
                 }
-                Ok(RType::Atom(RAtom::String(result)))
+                Ok(RValue::Atom(RAtom::String(result)))
             } else {
                 let mut result = 0.0;
                 for x in xs {
-                    if let RType::Atom(RAtom::Number(x)) = x {
+                    if let RValue::Atom(RAtom::Number(x)) = x {
                         result += x;
                     } else {
                         return Err(RError::Type(format!("`+` can not apply to {}", x)));
                     }
                 }
-                Ok(RType::Atom(RAtom::Number(result)))
+                Ok(RValue::Atom(RAtom::Number(result)))
             }
         }))
     );
@@ -793,28 +714,28 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                     "`-` needs at least 1 value.",
                 ))),
                 1 => {
-                    if let RType::Atom(RAtom::Number(x)) = xs[0] {
-                        Ok(RType::Atom(RAtom::Number(-x)))
+                    if let RValue::Atom(RAtom::Number(x)) = xs[0] {
+                        Ok(RValue::Atom(RAtom::Number(-x)))
                     } else {
                         Err(RError::Type(format!("`-` can not apply to {}", xs[0])))
                     }
                 }
                 _ => {
-                    let mut result = if let RType::Atom(RAtom::Number(x)) = xs[0] {
+                    let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
                         x
                     } else {
                         return Err(RError::Type(format!("`-` can not apply to {}", xs[0])));
                     };
 
                     for x in &xs[1..] {
-                        if let RType::Atom(RAtom::Number(x)) = x {
+                        if let RValue::Atom(RAtom::Number(x)) = x {
                             result -= *x;
                         } else {
                             return Err(RError::Type(format!("`-` can not apply to {}", x)));
                         }
                     }
 
-                    Ok(RType::Atom(RAtom::Number(result)))
+                    Ok(RValue::Atom(RAtom::Number(result)))
                 }
             }
         }))
@@ -832,13 +753,13 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
 
             let mut result = 1.0;
             for x in xs {
-                if let RType::Atom(RAtom::Number(x)) = x {
+                if let RValue::Atom(RAtom::Number(x)) = x {
                     result *= x;
                 } else {
                     return Err(RError::Type(format!("`*` can not apply to {}", x)));
                 }
             }
-            Ok(RType::Atom(RAtom::Number(result)))
+            Ok(RValue::Atom(RAtom::Number(result)))
         }))
     );
 
@@ -852,21 +773,21 @@ pub fn register_to(scope: &mut context::scope::Scope) -> Result<(), RError> {
                 )));
             }
 
-            let mut result = if let RType::Atom(RAtom::Number(x)) = xs[0] {
+            let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
                 x
             } else {
                 return Err(RError::Type(format!("`/` can not apply to {}", xs[0])));
             };
 
             for x in &xs[1..] {
-                if let RType::Atom(RAtom::Number(x)) = x {
+                if let RValue::Atom(RAtom::Number(x)) = x {
                     result /= *x;
                 } else {
                     return Err(RError::Type(format!("`/` can not apply to {}", x)));
                 }
             }
 
-            Ok(RType::Atom(RAtom::Number(result)))
+            Ok(RValue::Atom(RAtom::Number(result)))
         }))
     );
 
@@ -878,19 +799,20 @@ mod test {
     use super::*;
     use crate::parser::test::parse;
 
-    fn execute(code: &str) -> Result<RType, RError> {
-        let mut ctx = Context::new(context::scope::Scope::new());
-        assert_eq!(Ok(()), register_to(&mut ctx.scope().borrow_mut()));
+    fn execute(code: &str) -> Result<RValue, RError> {
+        let mut env = Env::new();
+        let scope = Scope::new();
+        assert_eq!(Ok(()), register_to(&scope));
 
         return match parse(code) {
-            Ok(x) => x.compute_last(&mut ctx),
+            Ok(x) => x.compute_last(&mut env, &scope),
             Err(err) => Err(err),
         };
     }
 
     fn assert_atom(expect: RAtom, code: &str) {
         match execute(code) {
-            Ok(RType::Atom(x)) => assert_eq!(expect, x),
+            Ok(RValue::Atom(x)) => assert_eq!(expect, x),
             Ok(x) => panic!("expected {} but got {}", expect, x),
             Err(err) => panic!("{}", err),
         }
@@ -996,15 +918,15 @@ mod test {
     #[test]
     fn panic() {
         assert_err(
-            RError::User(RType::Atom(RAtom::String(String::from("hello world")))),
+            RError::User(RValue::Atom(RAtom::String(String::from("hello world")))),
             r#"(panic! "hello world")"#,
         );
 
         assert_err(
-            RError::User(RType::Atom(RAtom::Number(123.0))),
+            RError::User(RValue::Atom(RAtom::Number(123.0))),
             r#"(panic! 123)"#,
         );
 
-        assert_err(RError::User(RType::nil()), "(panic!)");
+        assert_err(RError::User(RValue::nil()), "(panic!)");
     }
 }

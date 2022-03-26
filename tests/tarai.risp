@@ -1,0 +1,14 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./test.risp") assert))
+
+(def tarai (func (x y z)
+  (if (<= x y)
+    y
+    (tarai (tarai (- x 1) y z)
+           (tarai (- y 1) z x)
+           (tarai (- z 1) x y)))))
+
+"(assert = 9 (tarai 9 5 0))"
+
+(assert = 5 (tarai 5 3 0))

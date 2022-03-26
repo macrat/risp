@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
-use crate::context::trace::Position;
-use crate::types::{RAtom, RError, RList, RType};
+use crate::env::trace::Position;
+use crate::types::{RAtom, RError, RList, RValue};
 
 #[derive(Debug)]
 enum AtomBuilder {
@@ -147,7 +147,7 @@ pub struct Parser {
     position: Position,
     builder: AtomBuilder,
     stack: Vec<RList>,
-    queue: VecDeque<RType>,
+    queue: VecDeque<RValue>,
 }
 
 impl Parser {
@@ -164,36 +164,42 @@ impl Parser {
         }
     }
 
+    pub fn feed_char(&mut self, c: char) -> Result<(), RError> {
+        if c == '\n' {
+            self.position.line += 1;
+            self.position.col = 0;
+        } else {
+            self.position.col += 1;
+        }
+
+        match c {
+            '(' if !self.builder.is_string() => {
+                self.flush()?;
+                self.stack.push(RList::empty(Some(self.position.clone())));
+            }
+            ')' if !self.builder.is_string() => {
+                self.flush()?;
+                self.pop_stack()?;
+            }
+            ' ' | '\t' if !self.builder.is_string() => {
+                self.flush()?;
+            }
+            '\r' | '\n' => {
+                self.flush()?;
+            }
+            _ => {
+                if self.builder.push(c)? {
+                    self.flush()?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn feed(&mut self, text: &str) -> Result<(), RError> {
         for c in text.chars() {
-            if c == '\n' {
-                self.position.line += 1;
-                self.position.col = 0;
-            } else {
-                self.position.col += 1;
-            }
-
-            match c {
-                '(' if !self.builder.is_string() => {
-                    self.flush()?;
-                    self.stack.push(RList::empty(Some(self.position.clone())));
-                }
-                ')' if !self.builder.is_string() => {
-                    self.flush()?;
-                    self.pop_stack()?;
-                }
-                ' ' | '\t' if !self.builder.is_string() => {
-                    self.flush()?;
-                }
-                '\r' | '\n' => {
-                    self.flush()?;
-                }
-                _ => {
-                    if self.builder.push(c)? {
-                        self.flush()?;
-                    }
-                }
-            }
+            self.feed_char(c)?;
         }
         Ok(())
     }
@@ -204,7 +210,7 @@ impl Parser {
         } else {
             match self.builder.build() {
                 Ok(atom) => {
-                    self.push_stack(RType::Atom(atom));
+                    self.push_stack(RValue::Atom(atom));
                     Ok(())
                 }
                 Err(err) => Err(err),
@@ -212,7 +218,7 @@ impl Parser {
         }
     }
 
-    fn push_stack(&mut self, value: RType) {
+    fn push_stack(&mut self, value: RValue) {
         match self.stack.pop() {
             Some(mut top) => {
                 top.push(value);
@@ -224,7 +230,7 @@ impl Parser {
 
     fn pop_stack(&mut self) -> Result<(), RError> {
         if let Some(top) = self.stack.pop() {
-            self.push_stack(RType::List(top));
+            self.push_stack(RValue::List(top));
             Ok(())
         } else {
             Err(RError::Incompleted(String::new()))
@@ -239,7 +245,7 @@ impl Parser {
         }
     }
 
-    pub fn pop(&mut self) -> Option<RType> {
+    pub fn pop(&mut self) -> Option<RValue> {
         self.queue.pop_front()
     }
 
@@ -278,7 +284,7 @@ pub mod test {
         match parse(code) {
             Ok(val) => {
                 assert_eq!(1, val.len());
-                assert_eq!(RType::Atom(expect), val[0]);
+                assert_eq!(RValue::Atom(expect), val[0]);
             }
             Err(err) => panic!("{}", err),
         }

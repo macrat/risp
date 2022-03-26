@@ -1,17 +1,19 @@
 use std::fs;
+use std::rc::Rc;
 
-use crate::context::scope::Scope;
-use crate::context::Context;
+use crate::env::Env;
 use crate::funcs::register_to;
+use crate::scope::Scope;
 
 fn execute_test(source: String) {
-    let mut ctx = Context::new(Scope::new());
-    assert_eq!(Ok(()), register_to(&mut ctx.scope().borrow_mut()));
+    let mut env = Env::new();
+    let scope = Rc::new(Scope::new());
+    assert_eq!(Ok(()), register_to(&scope));
 
-    match ctx.load(source.into()) {
+    match env.load(&scope, source.into()) {
         Ok(_) => {}
         Err(err) => {
-            ctx.trace().borrow().print(err);
+            env.trace.print(err);
             panic!("assertion unsatisfied");
         }
     }
@@ -19,15 +21,16 @@ fn execute_test(source: String) {
 
 #[test]
 fn fail_test() {
-    let mut ctx = Context::new(Scope::new());
-    assert_eq!(Ok(()), register_to(&mut ctx.scope().borrow_mut()));
+    let mut env = Env::new();
+    let scope = Rc::new(Scope::new());
+    assert_eq!(Ok(()), register_to(&scope));
 
-    match ctx.load("./tests/fail-test.risp".into()) {
+    match env.load(&scope, "./tests/fail-test.risp".into()) {
         Ok(x) => panic!("expected error but got `{}`.", x),
         Err(err) => {
             assert_eq!(
                 r#"UserError: ("assertion unsatisfied" (= 1 2))"#,
-                err.to_string()
+                err.to_string(),
             );
         }
     }
