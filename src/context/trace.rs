@@ -33,6 +33,15 @@ impl Trace {
         self.stack.pop();
     }
 
+    pub fn position(&self) -> Option<Position> {
+        for x in self.stack.iter().rev() {
+            if let Some(x) = x.position() {
+                return Some(x);
+            }
+        }
+        None
+    }
+
     pub fn print(&self, err: RError) {
         for x in &self.stack {
             match x.position() {

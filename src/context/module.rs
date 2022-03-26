@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 use std::rc::Rc;
 
 use super::scope::Scope;
@@ -49,14 +50,28 @@ impl Module {
         }
 
         Ok(Module {
-            name,
+            name: format!("(import {:?})", name),
             scope: ctx.scope(),
         })
     }
 
     pub fn load(ctx: &mut Context, name: String) -> Result<Module, RError> {
-        match File::open(&name) {
-            Ok(file) => Module::load_from(ctx, name, BufReader::new(file)),
+        let cwd = match ctx.trace().borrow().position() {
+            Some(p) => p.file,
+            None => ".".to_string(),
+        };
+        let path = match Path::new(cwd.as_str())
+            .with_file_name(name.clone())
+            .canonicalize()
+        {
+            Ok(p) => match p.to_str() {
+                Some(p) => String::from(p),
+                None => return Err(RError::IO(format!("failed to lookup {}", name))),
+            },
+            Err(err) => return Err(RError::IO(format!("failed to lookup {}: {}", name, err))),
+        };
+        match File::open(path.clone()) {
+            Ok(file) => Module::load_from(ctx, path, BufReader::new(file)),
             Err(err) => Err(RError::IO(format!("failed to open {}: {}", name, err))),
         }
     }
@@ -70,7 +85,7 @@ impl Callable for Module {
     fn call(&self, ctx: &mut Context, args: RList) -> Result<RType, RError> {
         if args.len() != 1 {
             return Err(RError::Argument(format!(
-                "`{}` needs exact 1 argument but got {}.",
+                "{} needs exact 1 argument but got {}.",
                 self.name(),
                 args,
             )));

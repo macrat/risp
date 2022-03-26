@@ -55,27 +55,18 @@ impl Context {
             return Ok((*module).clone());
         }
 
-        if let Err(err) = self
-            .modules
+        self.modules
             .borrow_mut()
-            .define(name.clone(), Rc::new(RType::nil()))
-        {
-            return Err(err);
-        }
+            .define(name.clone(), Rc::new(RType::nil()))?;
 
-        match module::Module::load(
+        let module = module::Module::load(
             &mut self.overload(Rc::clone(&self.root_scope)).child(),
             name.clone(),
-        ) {
-            Ok(module) => {
-                let module = Rc::new(RType::Func(Rc::new(RFunc::Binary(Box::new(module)))));
-                match self.modules.borrow_mut().set(name, Rc::clone(&module)) {
-                    Ok(_) => Ok((*module).clone()),
-                    Err(err) => Err(err),
-                }
-            }
-            Err(err) => Err(err),
-        }
+        )?;
+        let module = Rc::new(RType::Func(Rc::new(RFunc::Binary(Box::new(module)))));
+
+        self.modules.borrow_mut().set(name, Rc::clone(&module))?;
+        Ok((*module).clone())
     }
 
     pub fn define_value(&self, name: String, value: Rc<RType>) -> Result<(), RError> {

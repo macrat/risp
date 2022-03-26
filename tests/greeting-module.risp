@@ -7,6 +7,6 @@
 
 " even you can load yourself in the module "
 (def say-hello-world (func ()
-  (((import "./tests/greeting-module.risp") say-hello) "world")))
+  (((import "./greeting-module.risp") say-hello) "world")))
 
 (println "module has loaded!")

@@ -1,6 +1,6 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./tests/test.risp") assert))
+(def assert ((import "./test.risp") assert))
 
 (assert = (list 1 2 3 4 5) (seq 5))
 (assert = (list -1 -2 -3) (seq -3))

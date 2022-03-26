@@ -1,6 +1,6 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./tests/test.risp") assert))
+(def assert ((import "./test.risp") assert))
 
 (do "tests of `is-number`"
   (assert = 1 (is-number 2))
