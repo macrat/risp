@@ -29,3 +29,11 @@
   (assert = 0 (is-func (list 12 34)))
   (assert = 1 (is-func if))
 )
+
+(do "tests of multiple values"
+  (assert = 1 (is-number 1 2 3))
+  (assert = 0 (is-number 1 2 "c"))
+  (assert = 0 (is-number 1 "b" 2))
+  (assert = 0 (is-number "a" 2 2))
+  (assert = 0 (is-number "a" "b" "c"))
+  (assert = 1 (is-string "a" "b" "c")))
