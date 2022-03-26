@@ -65,10 +65,10 @@ $ cargo run
 - `(list values...)`: make list that have `values`. this is the same as `'(values...)` in major Lisp implementations.
 - `(car list-or-string)`: take first item of the list, or take first character of the string.
 - `(cdr list-or-string)`: take second and later items of the list, or take second and later characters of the string.
-- `(seq to)` or `(seq from to)`: make list of int numbers. for example, `(seq 5)` makes `(list 1 2 3 4 5)`.
+- `(seq to)` or `(seq from to)`: make list of numbers. for example, `(seq 5)` makes `(list 1 2 3 4 5)`.
 
 #### type checking
-- `(is-int values...)`: check the values are int numbers.
+- `(is-number values...)`: check the values are numbers.
 - `(is-string values...)`: check the values are strings.
 - `(is-list values...)`: check the values are lists.
 - `(is-func values...)`: check the values are functions.
