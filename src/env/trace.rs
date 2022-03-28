@@ -38,9 +38,7 @@ impl Trace {
     }
 
     pub fn restore(&mut self, saved: usize) {
-        while self.stack.len() > saved {
-            self.stack.pop();
-        }
+        self.stack.truncate(saved);
     }
 
     pub fn position(&self) -> Option<Position> {
