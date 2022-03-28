@@ -1,12 +1,13 @@
+use std::convert::From;
 use std::fmt;
 
-use crate::types::{RError, RList};
+use crate::types::{RAtom, RError, RList, RValue};
 
 #[derive(Debug, Clone)]
 pub struct Position {
     pub file: String,
-    pub line: u64,
-    pub col: u64,
+    pub line: u32,
+    pub col: u32,
 }
 
 impl fmt::Display for Position {
@@ -62,5 +63,27 @@ impl Trace {
 
     pub fn clear(&mut self) {
         self.stack.clear()
+    }
+}
+
+impl From<&Trace> for RValue {
+    fn from(trace: &Trace) -> RValue {
+        let mut list = RList::empty(None);
+        for x in &trace.stack {
+            let (file, line, col_) = match x.position() {
+                Some(pos) => (pos.file, pos.line, pos.col),
+                None => ("<dynamic>".to_string(), 0, 0),
+            };
+            list.push(RValue::List(RList::from(
+                &[
+                    RValue::Atom(RAtom::String(file)),
+                    RValue::Atom(RAtom::Number(line.into())),
+                    RValue::Atom(RAtom::Number(col_.into())),
+                    RValue::Atom(RAtom::String(x.to_string())),
+                ],
+                None,
+            )));
+        }
+        RValue::List(list)
     }
 }

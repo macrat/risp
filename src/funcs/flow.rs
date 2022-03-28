@@ -125,16 +125,20 @@ impl Callable for TryCatch {
         match RList::from(&args[1..], None).compute_last(env, scope) {
             Ok(val) => Ok(val),
             Err(err) => {
-                // XXX: This variable named __error__ is not necessary, if interpreter can decide if a RList means calling function or just a list.
+                // XXX: This variables are not necessary, if interpreter can decide if a RList means calling function or just a list.
                 //      But in current implementation, this is necessary sadly.
                 let scope = scope.child();
                 scope.define("__error__".to_string(), err.into())?;
+                scope.define("__trace__".to_string(), (&env.trace).into())?;
 
                 let result = func.call(
                     env,
                     &scope,
                     RList::from(
-                        &[RValue::Atom(RAtom::Symbol("__error__".to_string()))],
+                        &[
+                            RValue::Atom(RAtom::Symbol("__error__".to_string())),
+                            RValue::Atom(RAtom::Symbol("__trace__".to_string())),
+                        ],
                         None,
                     ),
                 )?;

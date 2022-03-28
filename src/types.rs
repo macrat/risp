@@ -224,7 +224,7 @@ impl RList {
     }
 
     pub fn to_printable(&self) -> String {
-        format!("({})", self.to_bare_printable())
+        format!("({})", self.to_bare_string())
     }
 
     pub fn len(&self) -> usize {

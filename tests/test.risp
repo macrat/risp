@@ -7,6 +7,6 @@
 
 (assert = 1 1)
 
-(try-catch (func (err)
+(try-catch (func (err trace)
                  (assert = err (list "assertion unsatisfied" (list = 1 2))))
            (assert = 1 2))
