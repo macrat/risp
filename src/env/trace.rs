@@ -33,6 +33,16 @@ impl Trace {
         self.stack.pop();
     }
 
+    pub fn save(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn restore(&mut self, saved: usize) {
+        while self.stack.len() > saved {
+            self.stack.pop();
+        }
+    }
+
     pub fn position(&self) -> Option<Position> {
         for x in self.stack.iter().rev() {
             if let Some(x) = x.position() {

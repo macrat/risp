@@ -120,6 +120,8 @@ impl Callable for TryCatch {
             }
         };
 
+        let saved_trace = env.trace.save();
+
         match RList::from(&args[1..], None).compute_last(env, scope) {
             Ok(val) => Ok(val),
             Err(err) => {
@@ -128,14 +130,18 @@ impl Callable for TryCatch {
                 let scope = scope.child();
                 scope.define("__error__".to_string(), err.into())?;
 
-                func.call(
+                let result = func.call(
                     env,
                     &scope,
                     RList::from(
                         &[RValue::Atom(RAtom::Symbol("__error__".to_string()))],
                         None,
                     ),
-                )
+                )?;
+
+                env.trace.restore(saved_trace);
+
+                Ok(result)
             }
         }
     }
