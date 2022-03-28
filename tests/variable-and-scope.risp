@@ -22,3 +22,16 @@
     (def x "b")
     (assert = x "b"))
   (assert = x "a"))
+
+(do
+  (try-catch
+    (func (err)
+          (assert = err (list "not exist" "x does not exist.")))
+    (set x 42)))
+
+(do
+  (try-catch
+    (func (err)
+          (assert = err (list "already exist" "x is already exist.")))
+    (def x 1)
+    (def x 2)))

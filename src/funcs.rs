@@ -32,7 +32,8 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "if", binary_func!(flow::If));
     register!(scope, "while", binary_func!(flow::While));
     register!(scope, "do", binary_func!(flow::Do));
-    register!(scope, "panic!", binary_func!(flow::Panic));
+    register!(scope, "throw", binary_func!(flow::Throw));
+    register!(scope, "try-catch", binary_func!(flow::TryCatch));
 
     // function
     register!(scope, "func", binary_func!(func::Func));
@@ -113,7 +114,7 @@ mod test {
         #[test]
         fn plus() {
             assert_err(
-                RError::Argument(String::from("`+` needs at least 1 value.")),
+                RError::argument(String::from("`+` needs at least 1 value.")),
                 "(+)",
             );
 
@@ -133,11 +134,11 @@ mod test {
             );
 
             assert_err(
-                RError::Type(String::from("`+` can not apply to 123")),
+                RError::type_(String::from("`+` can not apply to 123")),
                 r#"(+ "hello" 123)"#,
             );
             assert_err(
-                RError::Type(String::from("`+` can not apply to \"hello\"")),
+                RError::type_(String::from("`+` can not apply to \"hello\"")),
                 r#"(+ 123 "hello")"#,
             );
         }
@@ -145,7 +146,7 @@ mod test {
         #[test]
         fn minus() {
             assert_err(
-                RError::Argument(String::from("`-` needs at least 1 value.")),
+                RError::argument(String::from("`-` needs at least 1 value.")),
                 "(-)",
             );
             assert_atom(RAtom::Number(-1.0), "(- 1)");
@@ -157,11 +158,11 @@ mod test {
         #[test]
         fn multiply() {
             assert_err(
-                RError::Argument(String::from("`*` needs at least 2 values.")),
+                RError::argument(String::from("`*` needs at least 2 values.")),
                 "(*)",
             );
             assert_err(
-                RError::Argument(String::from("`*` needs at least 2 values.")),
+                RError::argument(String::from("`*` needs at least 2 values.")),
                 "(* 1)",
             );
             assert_atom(RAtom::Number(2.0), "(* 1 2)");
@@ -171,11 +172,11 @@ mod test {
         #[test]
         fn divide() {
             assert_err(
-                RError::Argument(String::from("`/` needs at least 2 values.")),
+                RError::argument(String::from("`/` needs at least 2 values.")),
                 "(/)",
             );
             assert_err(
-                RError::Argument(String::from("`/` needs at least 2 values.")),
+                RError::argument(String::from("`/` needs at least 2 values.")),
                 "(/ 1)",
             );
             assert_atom(RAtom::Number(2.5), "(/ 5 2)");
@@ -184,30 +185,17 @@ mod test {
     }
 
     #[test]
-    fn def_and_set() {
-        assert_atom(RAtom::Number(42.0), "(def x 42) x");
-        assert_atom(RAtom::Number(3.0), "(def x (+ 1 2)) x");
-
-        assert_err(
-            RError::AlreadyExist(String::from("x")),
-            "(def x 1) (def x 2)",
-        );
-        assert_atom(RAtom::Number(2.0), "(def x 1) (set x 2) x");
-        assert_err(RError::NotExist(String::from("x")), "(set x 3) x");
-    }
-
-    #[test]
-    fn panic() {
+    fn throw() {
         assert_err(
             RError::User(RValue::Atom(RAtom::String(String::from("hello world")))),
-            r#"(panic! "hello world")"#,
+            r#"(throw "hello world")"#,
         );
 
         assert_err(
             RError::User(RValue::Atom(RAtom::Number(123.0))),
-            r#"(panic! 123)"#,
+            r#"(throw 123)"#,
         );
 
-        assert_err(RError::User(RValue::nil()), "(panic!)");
+        assert_err(RError::User(RValue::nil()), "(throw)");
     }
 }

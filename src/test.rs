@@ -14,7 +14,7 @@ fn execute_test(source: String) {
         Ok(_) => {}
         Err(err) => {
             env.trace.print(err);
-            panic!("assertion unsatisfied");
+            panic!("uncaught exception");
         }
     }
 }
@@ -28,10 +28,7 @@ fn fail_test() {
     match env.load(&scope, "./tests/fail-test.risp".into()) {
         Ok(x) => panic!("expected error but got `{}`.", x),
         Err(err) => {
-            assert_eq!(
-                r#"UserError: ("assertion unsatisfied" (= 1 2))"#,
-                err.to_string(),
-            );
+            assert_eq!(r#"("assertion unsatisfied" (= 1 2))"#, err.to_string(),);
         }
     }
 }

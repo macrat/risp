@@ -22,7 +22,7 @@ impl Drop for Internal {
 impl Internal {
     pub fn define(&mut self, name: String, value: RValue) -> Result<(), RError> {
         if self.values.contains_key(&name) {
-            Err(RError::AlreadyExist(name))
+            Err(RError::already_exist(name))
         } else {
             self.values.insert(name, value);
             Ok(())
@@ -36,7 +36,7 @@ impl Internal {
         } else if let Some(parent) = &mut self.parent {
             parent.set(name, value)
         } else {
-            Err(RError::NotExist(name))
+            Err(RError::not_exist(name))
         }
     }
 
@@ -46,7 +46,7 @@ impl Internal {
         } else if let Some(parent) = &self.parent {
             parent.get(name)
         } else {
-            Err(RError::NotExist(name.clone()))
+            Err(RError::not_exist(name.clone()))
         }
     }
 }

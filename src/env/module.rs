@@ -28,7 +28,7 @@ impl Module {
                     parser.feed(line.as_str())?;
                     parser.feed_char('\n')?;
                 }
-                Err(err) => return Err(RError::IO(format!("failed to read {}: {}", name, err))),
+                Err(err) => return Err(RError::io(format!("failed to read {}: {}", name, err))),
             };
 
             while let Some(expr) = parser.pop() {
@@ -59,13 +59,13 @@ impl Module {
         {
             Ok(p) => match p.to_str() {
                 Some(p) => String::from(p),
-                None => return Err(RError::IO(format!("failed to lookup {}", name))),
+                None => return Err(RError::io(format!("failed to lookup {}", name))),
             },
-            Err(err) => return Err(RError::IO(format!("failed to lookup {}: {}", name, err))),
+            Err(err) => return Err(RError::io(format!("failed to lookup {}: {}", name, err))),
         };
         match File::open(path.clone()) {
             Ok(file) => Module::load_from(env, scope, path, BufReader::new(file)),
-            Err(err) => Err(RError::IO(format!("failed to open {}: {}", name, err))),
+            Err(err) => Err(RError::io(format!("failed to open {}: {}", name, err))),
         }
     }
 }
@@ -77,7 +77,7 @@ impl Callable for Module {
 
     fn call(&self, env: &mut Env, _: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "{} needs exact 1 argument but got {}.",
                 self.name(),
                 args,

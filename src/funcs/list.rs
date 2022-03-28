@@ -25,7 +25,7 @@ impl Callable for Car {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
-            Err(RError::Argument(format!(
+            Err(RError::argument(format!(
                 "`car` needs exact 1 argument but got {} arguments",
                 args.len(),
             )))
@@ -36,7 +36,7 @@ impl Callable for Car {
                     Some(c) => Ok(RValue::Atom(RAtom::String(c.into()))),
                     None => Ok(RValue::Atom(RAtom::String(String::new()))),
                 },
-                x => Err(RError::Type(format!(
+                x => Err(RError::type_(format!(
                     "`car` needs list or string but got {}",
                     x,
                 ))),
@@ -55,7 +55,7 @@ impl Callable for Cdr {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
-            Err(RError::Argument(format!(
+            Err(RError::argument(format!(
                 "`cdr` needs exact 1 argument but got {} arguments",
                 args.len(),
             )))
@@ -67,7 +67,7 @@ impl Callable for Cdr {
                     chars.next();
                     Ok(RValue::Atom(RAtom::String(chars.as_str().into())))
                 }
-                x => Err(RError::Type(format!(
+                x => Err(RError::type_(format!(
                     "`cdr` needs list or string but got {}",
                     x,
                 ))),
@@ -86,7 +86,7 @@ impl Callable for Seq {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 && args.len() != 2 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`seq` needs 1 or 2 number argument but got {}",
                 args
             )));
@@ -97,7 +97,7 @@ impl Callable for Seq {
         let to = match &args[args.len() - 1] {
             RValue::Atom(RAtom::Number(n)) => *n,
             x => {
-                return Err(RError::Argument(format!(
+                return Err(RError::argument(format!(
                     "`seq` needs 1 or 2 number argument but got `{}`",
                     x
                 )))
@@ -111,7 +111,7 @@ impl Callable for Seq {
             match &args[0] {
                 RValue::Atom(RAtom::Number(n)) => *n,
                 x => {
-                    return Err(RError::Argument(format!(
+                    return Err(RError::argument(format!(
                         "`seq` needs 1 or 2 number argument but got `{}`",
                         x
                     )))
@@ -146,7 +146,7 @@ impl Callable for Map {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`map` needs exact 2 arguments but got {}.",
                 args
             )));
@@ -155,7 +155,7 @@ impl Callable for Map {
         let list = match args[0].compute(env, scope)? {
             RValue::List(xs) => xs,
             x => {
-                return Err(RError::Type(format!(
+                return Err(RError::type_(format!(
                     "the first argument of `map` must be a list, but got `{}`.",
                     x
                 )))
@@ -165,7 +165,7 @@ impl Callable for Map {
         let func = match args[1].compute(env, scope)? {
             RValue::Func(f) => f,
             x => {
-                return Err(RError::Type(format!(
+                return Err(RError::type_(format!(
                     "the second argument of `map` must be a function, but got `{}`.",
                     x
                 )))
@@ -192,7 +192,7 @@ impl Callable for Fold {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`fold` needs exact 2 arguments but got {}.",
                 args
             )));
@@ -201,13 +201,13 @@ impl Callable for Fold {
         let list = match args[0].compute(env, scope)? {
             RValue::List(xs) if xs.len() >= 2 => xs,
             RValue::List(xs) => {
-                return Err(RError::Type(format!(
+                return Err(RError::type_(format!(
                     "the first argument of `fold` must be longer than 2, but got `{}`.",
                     xs
                 )))
             }
             x => {
-                return Err(RError::Type(format!(
+                return Err(RError::type_(format!(
                     "the first argument of `fold` must be a list, but got `{}`.",
                     x
                 )))
@@ -217,7 +217,7 @@ impl Callable for Fold {
         let func = match args[1].compute(env, scope)? {
             RValue::Func(f) => f,
             x => {
-                return Err(RError::Type(format!(
+                return Err(RError::type_(format!(
                     "the second argument of `fold` must be a function, but got `{}`.",
                     x
                 )))

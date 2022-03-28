@@ -12,7 +12,7 @@ impl Callable for Def {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`def` needs exact 2 arguments but got `{}`.",
                 args
             )));
@@ -24,7 +24,7 @@ impl Callable for Def {
             scope.define(String::from(name), value.clone())?;
             Ok(value)
         } else {
-            Err(RError::Type(format!(
+            Err(RError::type_(format!(
                 "first argument of `def` should be a symbol."
             )))
         }
@@ -46,7 +46,7 @@ impl Callable for Set {
             scope.set(String::from(name), value.clone())?;
             Ok(value)
         } else {
-            Err(RError::Type(format!(
+            Err(RError::type_(format!(
                 "first argument of `set` should be a symbol."
             )))
         }

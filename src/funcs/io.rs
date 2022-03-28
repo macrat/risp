@@ -12,7 +12,7 @@ impl Callable for Import {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`import` needs exact 1 argument but got `{}`.",
                 args
             )));
@@ -21,7 +21,7 @@ impl Callable for Import {
         let name = match args[0].compute(env, scope)? {
             RValue::Atom(RAtom::String(x)) => x,
             x => {
-                return Err(RError::Type(format!(
+                return Err(RError::type_(format!(
                     "`import` needs a string as argument but got `{}`.",
                     x
                 )))

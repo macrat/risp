@@ -75,7 +75,8 @@ $ cargo run
 - `(if cond true-branch)` or `(if cond true-branch false-branch)`: check the `cond` is true or false, and execute branch. `0`, `""`, and `()` is false, otherwise true.
 - `(while cond values...)`: compute values while `cond` is true value, and returns the last value.
 - `(do values...)`: compute values in a new scope and returns the last value.
-- `(panic! message...)`: report critical error and exit program.
+- `(throw values...)`: report error with values. and exit program if the error does not caught by `try-catch`.
+- `(try-catch func expressions...)`: compute `expressions`, and call `func` if an error has throwed.
 
 ### function
 - `(func (args...) body...)`: make new function.

@@ -15,7 +15,7 @@ impl Callable for Func {
 
     fn call(&self, _: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() == 0 {
-            return Err(RError::Argument(
+            return Err(RError::argument(
                 "`func` needs at least 1 argument but got no argument.".into(),
             ));
         }
@@ -28,7 +28,7 @@ impl Callable for Func {
                         if let RValue::Atom(RAtom::Symbol(name)) = x {
                             symbols.push(String::from(name))
                         } else {
-                            return Err(RError::Type(String::from(
+                            return Err(RError::type_(String::from(
                                 "the first argument of `func` should be a list of symbol.",
                             )));
                         }
@@ -36,7 +36,7 @@ impl Callable for Func {
                     symbols
                 }
                 _ => {
-                    return Err(RError::Type(String::from(
+                    return Err(RError::type_(String::from(
                         "first argument of `func` should be a list of symbol.",
                     )))
                 }

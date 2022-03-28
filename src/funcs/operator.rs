@@ -23,7 +23,7 @@ impl Callable for CalculateOperator<'_> {
 
 pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
     if xs.len() == 0 {
-        return Err(RError::Argument(String::from(
+        return Err(RError::argument(String::from(
             "`+` needs at least 1 value.",
         )));
     }
@@ -34,7 +34,7 @@ pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
             if let RValue::Atom(RAtom::String(x)) = x {
                 result += &x;
             } else {
-                return Err(RError::Type(format!("`+` can not apply to {}", x)));
+                return Err(RError::type_(format!("`+` can not apply to {}", x)));
             }
         }
         Ok(RValue::Atom(RAtom::String(result)))
@@ -44,7 +44,7 @@ pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
             if let RValue::Atom(RAtom::Number(x)) = x {
                 result += x;
             } else {
-                return Err(RError::Type(format!("`+` can not apply to {}", x)));
+                return Err(RError::type_(format!("`+` can not apply to {}", x)));
             }
         }
         Ok(RValue::Atom(RAtom::Number(result)))
@@ -52,28 +52,28 @@ pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
 });
 
 pub const SUB: CalculateOperator = CalculateOperator("-", |xs| match xs.len() {
-    0 => Err(RError::Argument(String::from(
+    0 => Err(RError::argument(String::from(
         "`-` needs at least 1 value.",
     ))),
     1 => {
         if let RValue::Atom(RAtom::Number(x)) = xs[0] {
             Ok(RValue::Atom(RAtom::Number(-x)))
         } else {
-            Err(RError::Type(format!("`-` can not apply to {}", xs[0])))
+            Err(RError::type_(format!("`-` can not apply to {}", xs[0])))
         }
     }
     _ => {
         let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
             x
         } else {
-            return Err(RError::Type(format!("`-` can not apply to {}", xs[0])));
+            return Err(RError::type_(format!("`-` can not apply to {}", xs[0])));
         };
 
         for x in &xs[1..] {
             if let RValue::Atom(RAtom::Number(x)) = x {
                 result -= *x;
             } else {
-                return Err(RError::Type(format!("`-` can not apply to {}", x)));
+                return Err(RError::type_(format!("`-` can not apply to {}", x)));
             }
         }
 
@@ -83,7 +83,7 @@ pub const SUB: CalculateOperator = CalculateOperator("-", |xs| match xs.len() {
 
 pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
     if xs.len() < 2 {
-        return Err(RError::Argument(String::from(
+        return Err(RError::argument(String::from(
             "`*` needs at least 2 values.",
         )));
     }
@@ -93,7 +93,7 @@ pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
         if let RValue::Atom(RAtom::Number(x)) = x {
             result *= x;
         } else {
-            return Err(RError::Type(format!("`*` can not apply to {}", x)));
+            return Err(RError::type_(format!("`*` can not apply to {}", x)));
         }
     }
     Ok(RValue::Atom(RAtom::Number(result)))
@@ -101,7 +101,7 @@ pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
 
 pub const DIVIDE: CalculateOperator = CalculateOperator("/", |xs| {
     if xs.len() < 2 {
-        return Err(RError::Argument(String::from(
+        return Err(RError::argument(String::from(
             "`/` needs at least 2 values.",
         )));
     }
@@ -109,14 +109,14 @@ pub const DIVIDE: CalculateOperator = CalculateOperator("/", |xs| {
     let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
         x
     } else {
-        return Err(RError::Type(format!("`/` can not apply to {}", xs[0])));
+        return Err(RError::type_(format!("`/` can not apply to {}", xs[0])));
     };
 
     for x in &xs[1..] {
         if let RValue::Atom(RAtom::Number(x)) = x {
             result /= *x;
         } else {
-            return Err(RError::Type(format!("`/` can not apply to {}", x)));
+            return Err(RError::type_(format!("`/` can not apply to {}", x)));
         }
     }
 
@@ -132,7 +132,7 @@ impl Callable for CompareOperator<'_> {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() < 2 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`{}` needs at least 2 values.",
                 self.0,
             )));
@@ -171,7 +171,7 @@ impl Callable for Not {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 1 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`not` needs exact 1 argument but got `{}`.",
                 args
             )));

@@ -65,7 +65,7 @@ impl AtomBuilder {
                 completed: true,
             } => {
                 buf.push(c);
-                return Err(RError::InvalidLiteral(buf.clone()));
+                return Err(RError::invalid_literal(buf.clone()));
             }
             AtomBuilder::String {
                 buf,
@@ -80,7 +80,7 @@ impl AtomBuilder {
                         '0' => '\0',
                         '\\' => '\\',
                         '"' => '"',
-                        _ => return Err(RError::InvalidEscape(c)),
+                        _ => return Err(RError::invalid_escape(c)),
                     });
                     *escape = false;
                 } else {
@@ -122,20 +122,20 @@ impl AtomBuilder {
             AtomBuilder::Number(buf) if buf == "-" => Ok(RAtom::Symbol(buf.clone())),
             AtomBuilder::Number(buf) => match buf.parse::<f64>() {
                 Ok(n) => Ok(RAtom::Number(n)),
-                Err(_) => Err(RError::InvalidLiteral(buf.clone())),
+                Err(_) => Err(RError::invalid_literal(buf.clone())),
             },
             AtomBuilder::String {
                 buf,
                 escape: _,
                 completed: false,
-            } => Err(RError::Incompleted(buf.clone())),
+            } => Err(RError::incompleted(buf.clone())),
             AtomBuilder::String {
                 buf,
                 escape: _,
                 completed: true,
             } => Ok(RAtom::String(buf.clone())),
-            AtomBuilder::Invalid(buf) => Err(RError::InvalidLiteral(buf.clone())),
-            AtomBuilder::Nil => Err(RError::InvalidLiteral(String::new())),
+            AtomBuilder::Invalid(buf) => Err(RError::invalid_literal(buf.clone())),
+            AtomBuilder::Nil => Err(RError::invalid_literal(String::new())),
         };
         *self = AtomBuilder::Nil;
         result
@@ -233,7 +233,7 @@ impl Parser {
             self.push_stack(RValue::List(top));
             Ok(())
         } else {
-            Err(RError::Incompleted(String::new()))
+            Err(RError::incompleted(String::new()))
         }
     }
 
@@ -255,7 +255,7 @@ impl Parser {
         }
 
         if !self.is_completed() {
-            return Err(RError::Incompleted(self.builder.get_buf()));
+            return Err(RError::incompleted(self.builder.get_buf()));
         }
 
         Ok(self.stack.len())
@@ -322,15 +322,18 @@ pub mod test {
         assert_atom(RAtom::Number(-1.234), " -1.234 ");
 
         assert_err(
-            RError::InvalidLiteral(String::from("0hello")),
+            RError::invalid_literal(String::from("0hello")),
             "0hello world1",
         );
-        assert_err(RError::InvalidLiteral(String::from("-1abc")), "-1abc");
+        assert_err(RError::invalid_literal(String::from("-1abc")), "-1abc");
         assert_err(
-            RError::InvalidLiteral(String::from("123_456")),
+            RError::invalid_literal(String::from("123_456")),
             "123_456 abc",
         );
-        assert_err(RError::InvalidLiteral(String::from("12.34.56")), "12.34.56");
+        assert_err(
+            RError::invalid_literal(String::from("12.34.56")),
+            "12.34.56",
+        );
     }
 
     #[test]
@@ -340,17 +343,17 @@ pub mod test {
         assert_str("\t\r\n\\", r#"  "\t\r\n\\"  "#);
         assert_str("hello (world)", r#"  "hello (world)"  "#);
 
-        assert_err(RError::InvalidEscape('a'), r#""\a""#);
-        assert_err(RError::Incompleted(String::from("hello")), "\"hello\n");
+        assert_err(RError::invalid_escape('a'), r#""\a""#);
+        assert_err(RError::incompleted(String::from("hello")), "\"hello\n");
         assert_err(
-            RError::Incompleted(String::from("hello\"  ")),
+            RError::incompleted(String::from("hello\"  ")),
             r#"  "hello\"  "#,
         );
     }
 
     #[test]
     fn list() {
-        assert_err(RError::Incompleted(String::new()), r#"  ("hello"  "#);
-        assert_err(RError::Incompleted(String::new()), r#"  123)  "#);
+        assert_err(RError::incompleted(String::new()), r#"  ("hello"  "#);
+        assert_err(RError::incompleted(String::new()), r#"  123)  "#);
     }
 }

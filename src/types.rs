@@ -9,14 +9,7 @@ use crate::scope::Scope;
 
 #[derive(Debug, PartialEq)]
 pub enum RError {
-    Type(String),
-    AlreadyExist(String),
-    NotExist(String),
-    Argument(String),
-    Incompleted(String),
-    InvalidLiteral(String),
-    InvalidEscape(char),
-    IO(String),
+    System(String, String),
     User(RValue),
 }
 
@@ -25,34 +18,82 @@ fn escape_string(s: &String) -> String {
     s[1..s.len() - 1].to_string()
 }
 
+impl RError {
+    pub fn type_(reason: String) -> RError {
+        RError::System("incompatible type".to_string(), reason)
+    }
+
+    pub fn already_exist(name: String) -> RError {
+        RError::System(
+            "already exist".to_string(),
+            format!("{} is already exist.", name),
+        )
+    }
+
+    pub fn not_exist(name: String) -> RError {
+        RError::System("not exist".to_string(), format!("{} does not exist.", name))
+    }
+
+    pub fn argument(reason: String) -> RError {
+        RError::System("invalid argument".to_string(), reason)
+    }
+
+    pub fn incompleted(buf: String) -> RError {
+        RError::System(
+            "incompleted expression".to_string(),
+            if buf == "" {
+                "expression is not completed".to_string()
+            } else {
+                format!("expression is not completed: {}", escape_string(&buf))
+            },
+        )
+    }
+
+    pub fn invalid_literal(literal: String) -> RError {
+        RError::System(
+            "invalid literal".to_string(),
+            format!("{} is invalid literal", escape_string(&literal),),
+        )
+    }
+
+    pub fn invalid_escape(c: char) -> RError {
+        RError::System(
+            "invalid escape".to_string(),
+            format!(r#""\{}" is invalid escape in string."#, c,),
+        )
+    }
+
+    pub fn io(reason: String) -> RError {
+        RError::System("io".to_string(), reason)
+    }
+}
+
 impl fmt::Display for RError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            RError::Type(reason) => write!(f, "TypeError: {}", reason),
-            RError::AlreadyExist(name) => {
-                write!(f, "AlreadyExistError: {} is already exist.", name)
-            }
-            RError::NotExist(name) => write!(f, "NotExistError: {} does not exist.", name),
-            RError::Argument(reason) => write!(f, "ArgumentError: {}", reason),
-            RError::Incompleted(buf) => {
-                write!(
-                    f,
-                    "IncompletedError: expression is not completed: {}",
-                    escape_string(buf)
-                )
-            }
-            RError::InvalidLiteral(literal) => write!(
-                f,
-                "InvalidLiteralError: {} is invalid literal.",
-                escape_string(literal),
-            ),
-            RError::InvalidEscape(c) => write!(
-                f,
-                r#"InvalidEscapeError: "\{}" is invalid escape in string."#,
-                c
-            ),
-            RError::IO(reason) => write!(f, "IOError: {}", reason),
-            RError::User(message) => write!(f, "UserError: {}", message.to_string()),
+            RError::System(category, detail) => write!(f, "{}: {}", category, detail),
+            RError::User(obj) => write!(f, "{}", obj),
+        }
+    }
+}
+
+impl From<RValue> for RError {
+    fn from(val: RValue) -> RError {
+        RError::User(val)
+    }
+}
+
+impl From<RError> for RValue {
+    fn from(err: RError) -> RValue {
+        match err {
+            RError::System(category, detail) => RValue::List(RList::from(
+                &[
+                    RValue::Atom(RAtom::String(category)),
+                    RValue::Atom(RAtom::String(detail)),
+                ],
+                None,
+            )),
+            RError::User(obj) => obj.clone(),
         }
     }
 }
@@ -136,7 +177,7 @@ impl RList {
                         Err(err) => Err(err),
                     }
                 }
-                _ => Err(RError::Type(format!("`{}` is not a function.", first))),
+                _ => Err(RError::type_(format!("`{}` is not a function.", first))),
             },
             Err(err) => Err(err),
         }
@@ -315,7 +356,7 @@ impl Callable for RFunc {
                 capture,
             } => {
                 if args.0.len() != arg_names.len() {
-                    return Err(RError::Argument(format!(
+                    return Err(RError::argument(format!(
                         "this function needs {} arguments but got {} arguments.",
                         arg_names.len(),
                         args.0.len()
@@ -382,7 +423,7 @@ impl RValue {
                 if let Some(ord) = x.partial_cmp(y) {
                     Ok(ord)
                 } else {
-                    Err(RError::Type(format!(
+                    Err(RError::type_(format!(
                         "`{}` and `{}` are not comparable.",
                         self, other
                     )))
@@ -390,7 +431,7 @@ impl RValue {
             }
             (RValue::Atom(RAtom::String(x)), RValue::Atom(RAtom::String(y))) => Ok(x.cmp(y)),
             (RValue::List(x), RValue::List(y)) => x.cmp(y),
-            (_, _) => Err(RError::Type(format!(
+            (_, _) => Err(RError::type_(format!(
                 "`{}` and `{}` are not comparable.",
                 self, other
             ))),

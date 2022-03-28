@@ -12,7 +12,7 @@ impl Callable for If {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() != 2 && args.len() != 3 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`if` requires 2 or 3 arguments but got {} arguments.",
                 args.len(),
             )));
@@ -40,7 +40,7 @@ impl Callable for While {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         if args.len() == 0 {
-            return Err(RError::Argument(format!(
+            return Err(RError::argument(format!(
                 "`while` needs 1 or more arguments but got {}.",
                 args,
             )));
@@ -75,21 +75,68 @@ impl Callable for Do {
 }
 
 #[derive(Debug)]
-pub struct Panic;
+pub struct Throw;
 
-impl Callable for Panic {
+impl Callable for Throw {
     fn name(&self) -> &str {
-        "panic!"
+        "throw"
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         match args.len() {
-            0 => Err(RError::User(RValue::nil())),
-            1 => Err(RError::User(args[0].compute(env, scope)?)),
-            _ => Err(RError::Argument(format!(
-                "`panic!` needs 0 or 1 argument but got {}",
+            0 => Err(RValue::nil().into()),
+            1 => Err(args[0].compute(env, scope)?.into()),
+            _ => Err(RError::argument(format!(
+                "`throw` needs 0 or 1 argument but got {}",
                 args,
             ))),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TryCatch;
+
+impl Callable for TryCatch {
+    fn name(&self) -> &str {
+        "try-catch"
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        if args.len() < 2 {
+            return Err(RError::argument(format!(
+                "`try-catch` needs at least 2 arguments but got {}",
+                args,
+            )));
+        }
+
+        let func = match args[0].compute(env, scope)? {
+            RValue::Func(func) => func,
+            x => {
+                return Err(RError::argument(format!(
+                    "the first argument of `try-catch` should be a function but got {}",
+                    x,
+                )))
+            }
+        };
+
+        match RList::from(&args[1..], None).compute_last(env, scope) {
+            Ok(val) => Ok(val),
+            Err(err) => {
+                // XXX: This variable named __error__ is not necessary, if interpreter can decide if a RList means calling function or just a list.
+                //      But in current implementation, this is necessary sadly.
+                let scope = scope.child();
+                scope.define("__error__".to_string(), err.into())?;
+
+                func.call(
+                    env,
+                    &scope,
+                    RList::from(
+                        &[RValue::Atom(RAtom::Symbol("__error__".to_string()))],
+                        None,
+                    ),
+                )
+            }
         }
     }
 }
