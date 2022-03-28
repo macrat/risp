@@ -1,7 +1,7 @@
 use std::convert::From;
 use std::fmt;
 
-use crate::types::{RAtom, RError, RList, RValue};
+use crate::types::{RError, RList, RValue};
 
 #[derive(Debug, Clone)]
 pub struct Position {
@@ -76,10 +76,10 @@ impl From<&Trace> for RValue {
             };
             list.push(RValue::List(RList::from(
                 &[
-                    RValue::Atom(RAtom::String(file)),
-                    RValue::Atom(RAtom::Number(line.into())),
-                    RValue::Atom(RAtom::Number(col_.into())),
-                    RValue::Atom(RAtom::String(x.to_string())),
+                    file.into(),
+                    f64::from(line).into(),
+                    f64::from(col_).into(),
+                    x.to_string().into(),
                 ],
                 None,
             )));

@@ -128,16 +128,16 @@ impl Callable for TryCatch {
                 // XXX: This variables are not necessary, if interpreter can decide if a RList means calling function or just a list.
                 //      But in current implementation, this is necessary sadly.
                 let scope = scope.child();
-                scope.define("__error__".to_string(), err.into())?;
-                scope.define("__trace__".to_string(), (&env.trace).into())?;
+                scope.define("__error__".into(), err.into())?;
+                scope.define("__trace__".into(), (&env.trace).into())?;
 
                 let result = func.call(
                     env,
                     &scope,
                     RList::from(
                         &[
-                            RValue::Atom(RAtom::Symbol("__error__".to_string())),
-                            RValue::Atom(RAtom::Symbol("__trace__".to_string())),
+                            RValue::Atom(RAtom::Symbol("__error__".into())),
+                            RValue::Atom(RAtom::Symbol("__trace__".into())),
                         ],
                         None,
                     ),

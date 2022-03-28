@@ -23,9 +23,7 @@ impl Callable for CalculateOperator<'_> {
 
 pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
     if xs.len() == 0 {
-        return Err(RError::argument(String::from(
-            "`+` needs at least 1 value.",
-        )));
+        return Err(RError::argument("`+` needs at least 1 value.".into()));
     }
 
     if let RValue::Atom(RAtom::String(_)) = xs[0] {
@@ -37,7 +35,7 @@ pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
                 return Err(RError::type_(format!("`+` can not apply to {}", x)));
             }
         }
-        Ok(RValue::Atom(RAtom::String(result)))
+        Ok(result.into())
     } else {
         let mut result = 0.0;
         for x in xs {
@@ -47,17 +45,15 @@ pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
                 return Err(RError::type_(format!("`+` can not apply to {}", x)));
             }
         }
-        Ok(RValue::Atom(RAtom::Number(result)))
+        Ok(result.into())
     }
 });
 
 pub const SUB: CalculateOperator = CalculateOperator("-", |xs| match xs.len() {
-    0 => Err(RError::argument(String::from(
-        "`-` needs at least 1 value.",
-    ))),
+    0 => Err(RError::argument("`-` needs at least 1 value.".into())),
     1 => {
         if let RValue::Atom(RAtom::Number(x)) = xs[0] {
-            Ok(RValue::Atom(RAtom::Number(-x)))
+            Ok((-x).into())
         } else {
             Err(RError::type_(format!("`-` can not apply to {}", xs[0])))
         }
@@ -77,15 +73,13 @@ pub const SUB: CalculateOperator = CalculateOperator("-", |xs| match xs.len() {
             }
         }
 
-        Ok(RValue::Atom(RAtom::Number(result)))
+        Ok(result.into())
     }
 });
 
 pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
     if xs.len() < 2 {
-        return Err(RError::argument(String::from(
-            "`*` needs at least 2 values.",
-        )));
+        return Err(RError::argument("`*` needs at least 2 values.".into()));
     }
 
     let mut result = 1.0;
@@ -96,14 +90,12 @@ pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
             return Err(RError::type_(format!("`*` can not apply to {}", x)));
         }
     }
-    Ok(RValue::Atom(RAtom::Number(result)))
+    Ok(result.into())
 });
 
 pub const DIVIDE: CalculateOperator = CalculateOperator("/", |xs| {
     if xs.len() < 2 {
-        return Err(RError::argument(String::from(
-            "`/` needs at least 2 values.",
-        )));
+        return Err(RError::argument("`/` needs at least 2 values.".into()));
     }
 
     let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
@@ -120,7 +112,7 @@ pub const DIVIDE: CalculateOperator = CalculateOperator("/", |xs| {
         }
     }
 
-    Ok(RValue::Atom(RAtom::Number(result)))
+    Ok(result.into())
 });
 
 pub struct CompareOperator<'a>(&'a str, fn(&RValue, &RValue) -> Result<bool, RError>);
@@ -143,12 +135,12 @@ impl Callable for CompareOperator<'_> {
         for y in &args[1..] {
             let y = y.compute(env, scope)?;
             if !self.1(&x, &y)? {
-                return Ok(RValue::Atom(RAtom::Number(0.0)));
+                return Ok(0.0.into());
             }
             x = y;
         }
 
-        Ok(RValue::Atom(RAtom::Number(1.0)))
+        Ok(1.0.into())
     }
 }
 
@@ -173,7 +165,7 @@ impl Callable for Not {
         if args.len() != 1 {
             return Err(RError::argument(format!(
                 "`not` needs exact 1 argument but got `{}`.",
-                args
+                args,
             )));
         }
 
@@ -182,6 +174,6 @@ impl Callable for Not {
         } else {
             1.0
         };
-        Ok(RValue::Atom(RAtom::Number(result)))
+        Ok(result.into())
     }
 }

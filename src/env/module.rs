@@ -58,7 +58,7 @@ impl Module {
             .canonicalize()
         {
             Ok(p) => match p.to_str() {
-                Some(p) => String::from(p),
+                Some(p) => p.to_string(),
                 None => return Err(RError::io(format!("failed to lookup {}", name))),
             },
             Err(err) => return Err(RError::io(format!("failed to lookup {}: {}", name, err))),

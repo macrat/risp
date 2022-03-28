@@ -121,7 +121,7 @@ impl AtomBuilder {
             AtomBuilder::Symbol(buf) => Ok(RAtom::Symbol(buf.clone())),
             AtomBuilder::Number(buf) if buf == "-" => Ok(RAtom::Symbol(buf.clone())),
             AtomBuilder::Number(buf) => match buf.parse::<f64>() {
-                Ok(n) => Ok(RAtom::Number(n)),
+                Ok(n) => Ok(n.into()),
                 Err(_) => Err(RError::invalid_literal(buf.clone())),
             },
             AtomBuilder::String {
@@ -133,7 +133,7 @@ impl AtomBuilder {
                 buf,
                 escape: _,
                 completed: true,
-            } => Ok(RAtom::String(buf.clone())),
+            } => Ok(buf.clone().into()),
             AtomBuilder::Invalid(buf) => Err(RError::invalid_literal(buf.clone())),
             AtomBuilder::Nil => Err(RError::invalid_literal(String::new())),
         };
@@ -298,11 +298,11 @@ pub mod test {
     }
 
     fn assert_symbol(expect: &str, code: &str) {
-        assert_atom(RAtom::Symbol(String::from(expect)), code)
+        assert_atom(RAtom::Symbol(expect.into()), code)
     }
 
     fn assert_str(expect: &str, code: &str) {
-        assert_atom(RAtom::String(String::from(expect)), code)
+        assert_atom(expect.into(), code)
     }
 
     #[test]
@@ -315,25 +315,16 @@ pub mod test {
 
     #[test]
     fn int() {
-        assert_atom(RAtom::Number(1.0), "1");
-        assert_atom(RAtom::Number(2.0), " 2 ");
-        assert_atom(RAtom::Number(42.0), " 42 ");
-        assert_atom(RAtom::Number(12.345), " 12.345 ");
-        assert_atom(RAtom::Number(-1.234), " -1.234 ");
+        assert_atom(1.0.into(), "1");
+        assert_atom(2.0.into(), " 2 ");
+        assert_atom(42.0.into(), " 42 ");
+        assert_atom(12.345.into(), " 12.345 ");
+        assert_atom((-1.234).into(), " -1.234 ");
 
-        assert_err(
-            RError::invalid_literal(String::from("0hello")),
-            "0hello world1",
-        );
-        assert_err(RError::invalid_literal(String::from("-1abc")), "-1abc");
-        assert_err(
-            RError::invalid_literal(String::from("123_456")),
-            "123_456 abc",
-        );
-        assert_err(
-            RError::invalid_literal(String::from("12.34.56")),
-            "12.34.56",
-        );
+        assert_err(RError::invalid_literal("0hello".into()), "0hello world1");
+        assert_err(RError::invalid_literal("-1abc".into()), "-1abc");
+        assert_err(RError::invalid_literal("123_456".into()), "123_456 abc");
+        assert_err(RError::invalid_literal("12.34.56".into()), "12.34.56");
     }
 
     #[test]
@@ -344,16 +335,13 @@ pub mod test {
         assert_str("hello (world)", r#"  "hello (world)"  "#);
 
         assert_err(RError::invalid_escape('a'), r#""\a""#);
-        assert_err(RError::incompleted(String::from("hello")), "\"hello\n");
-        assert_err(
-            RError::incompleted(String::from("hello\"  ")),
-            r#"  "hello\"  "#,
-        );
+        assert_err(RError::incompleted("hello".into()), "\"hello\n");
+        assert_err(RError::incompleted("hello\"  ".into()), r#"  "hello\"  "#);
     }
 
     #[test]
     fn list() {
-        assert_err(RError::incompleted(String::new()), r#"  ("hello"  "#);
-        assert_err(RError::incompleted(String::new()), r#"  123)  "#);
+        assert_err(RError::incompleted("".into()), r#"  ("hello"  "#);
+        assert_err(RError::incompleted("".into()), r#"  123)  "#);
     }
 }

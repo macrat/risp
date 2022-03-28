@@ -19,7 +19,7 @@ macro_rules! binary_func {
 
 macro_rules! register {
     ($scope:expr, $name:expr, $value:expr) => {
-        $scope.define(String::from($name), $value)?;
+        $scope.define($name.into(), $value)?;
     };
 }
 
@@ -114,31 +114,25 @@ mod test {
         #[test]
         fn plus() {
             assert_err(
-                RError::argument(String::from("`+` needs at least 1 value.")),
+                RError::argument("`+` needs at least 1 value.".into()),
                 "(+)",
             );
 
-            assert_atom(RAtom::Number(1.0), "(+ 1)");
-            assert_atom(RAtom::Number(3.0), "(+ 1 2)");
-            assert_atom(RAtom::Number(15.0), "(+ 1 2 3 4 5)");
-            assert_atom(RAtom::Number(15.0), "(+ 1 (+ 2 3) 4 5)");
+            assert_atom(1.0.into(), "(+ 1)");
+            assert_atom(3.0.into(), "(+ 1 2)");
+            assert_atom(15.0.into(), "(+ 1 2 3 4 5)");
+            assert_atom(15.0.into(), "(+ 1 (+ 2 3) 4 5)");
 
-            assert_atom(RAtom::String(String::from("hello")), r#"(+ "hello")"#);
-            assert_atom(
-                RAtom::String(String::from("helloworld")),
-                r#"(+ "hello" "world")"#,
-            );
-            assert_atom(
-                RAtom::String(String::from("hello world")),
-                r#"(+ "hello" " " "world")"#,
-            );
+            assert_atom("hello".into(), r#"(+ "hello")"#);
+            assert_atom("helloworld".into(), r#"(+ "hello" "world")"#);
+            assert_atom("hello world".into(), r#"(+ "hello" " " "world")"#);
 
             assert_err(
-                RError::type_(String::from("`+` can not apply to 123")),
+                RError::type_("`+` can not apply to 123".into()),
                 r#"(+ "hello" 123)"#,
             );
             assert_err(
-                RError::type_(String::from("`+` can not apply to \"hello\"")),
+                RError::type_("`+` can not apply to \"hello\"".into()),
                 r#"(+ 123 "hello")"#,
             );
         }
@@ -146,55 +140,52 @@ mod test {
         #[test]
         fn minus() {
             assert_err(
-                RError::argument(String::from("`-` needs at least 1 value.")),
+                RError::argument("`-` needs at least 1 value.".into()),
                 "(-)",
             );
-            assert_atom(RAtom::Number(-1.0), "(- 1)");
-            assert_atom(RAtom::Number(-1.0), "(- 1 2)");
-            assert_atom(RAtom::Number(-13.0), "(- 1 2 3 4 5)");
-            assert_atom(RAtom::Number(-7.0), "(- 1 (- 2 3) 4 5)");
+            assert_atom((-1.0).into(), "(- 1)");
+            assert_atom((-1.0).into(), "(- 1 2)");
+            assert_atom((-13.0).into(), "(- 1 2 3 4 5)");
+            assert_atom((-7.0).into(), "(- 1 (- 2 3) 4 5)");
         }
 
         #[test]
         fn multiply() {
             assert_err(
-                RError::argument(String::from("`*` needs at least 2 values.")),
+                RError::argument("`*` needs at least 2 values.".into()),
                 "(*)",
             );
             assert_err(
-                RError::argument(String::from("`*` needs at least 2 values.")),
+                RError::argument("`*` needs at least 2 values.".into()),
                 "(* 1)",
             );
-            assert_atom(RAtom::Number(2.0), "(* 1 2)");
-            assert_atom(RAtom::Number(120.0), "(* 1 2 3 4 5)");
+            assert_atom(2.0.into(), "(* 1 2)");
+            assert_atom(120.0.into(), "(* 1 2 3 4 5)");
         }
 
         #[test]
         fn divide() {
             assert_err(
-                RError::argument(String::from("`/` needs at least 2 values.")),
+                RError::argument("`/` needs at least 2 values.".into()),
                 "(/)",
             );
             assert_err(
-                RError::argument(String::from("`/` needs at least 2 values.")),
+                RError::argument("`/` needs at least 2 values.".into()),
                 "(/ 1)",
             );
-            assert_atom(RAtom::Number(2.5), "(/ 5 2)");
-            assert_atom(RAtom::Number(5.0), "(/ 20 2 2)");
+            assert_atom(2.5.into(), "(/ 5 2)");
+            assert_atom(5.0.into(), "(/ 20 2 2)");
         }
     }
 
     #[test]
     fn throw() {
         assert_err(
-            RError::User(RValue::Atom(RAtom::String(String::from("hello world")))),
+            RError::User("hello world".into()),
             r#"(throw "hello world")"#,
         );
 
-        assert_err(
-            RError::User(RValue::Atom(RAtom::Number(123.0))),
-            r#"(throw 123)"#,
-        );
+        assert_err(RError::User(123.0.into()), r"(throw 123)");
 
         assert_err(RError::User(RValue::nil()), "(throw)");
     }

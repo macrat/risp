@@ -33,8 +33,8 @@ impl Callable for Car {
             match args[0].compute(env, scope)? {
                 RValue::List(list) => Ok(list[0].clone()),
                 RValue::Atom(RAtom::String(x)) => match x.chars().next() {
-                    Some(c) => Ok(RValue::Atom(RAtom::String(c.into()))),
-                    None => Ok(RValue::Atom(RAtom::String(String::new()))),
+                    Some(c) => Ok(c.to_string().into()),
+                    None => Ok("".into()),
                 },
                 x => Err(RError::type_(format!(
                     "`car` needs list or string but got {}",
@@ -65,7 +65,7 @@ impl Callable for Cdr {
                 RValue::Atom(RAtom::String(x)) => {
                     let mut chars = x.chars();
                     chars.next();
-                    Ok(RValue::Atom(RAtom::String(chars.as_str().into())))
+                    Ok(chars.as_str().into())
                 }
                 x => Err(RError::type_(format!(
                     "`cdr` needs list or string but got {}",
@@ -128,10 +128,10 @@ impl Callable for Seq {
         let mut result = RList::empty(None);
         let mut i = from;
         while i != to {
-            result.push(RValue::Atom(RAtom::Number(i)));
+            result.push(i.into());
             i += step;
         }
-        result.push(RValue::Atom(RAtom::Number(i)));
+        result.push(i.into());
         Ok(RValue::List(result))
     }
 }

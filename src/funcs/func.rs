@@ -26,19 +26,19 @@ impl Callable for Func {
                     let mut symbols: Vec<String> = Vec::new();
                     for x in list.iter() {
                         if let RValue::Atom(RAtom::Symbol(name)) = x {
-                            symbols.push(String::from(name))
+                            symbols.push(name.into())
                         } else {
-                            return Err(RError::type_(String::from(
-                                "the first argument of `func` should be a list of symbol.",
-                            )));
+                            return Err(RError::type_(
+                                "the first argument of `func` should be a list of symbol.".into(),
+                            ));
                         }
                     }
                     symbols
                 }
                 _ => {
-                    return Err(RError::type_(String::from(
-                        "first argument of `func` should be a list of symbol.",
-                    )))
+                    return Err(RError::type_(
+                        "first argument of `func` should be a list of symbol.".into(),
+                    ))
                 }
             },
             body: RList::from(&args[1..], None),

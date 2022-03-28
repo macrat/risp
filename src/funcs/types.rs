@@ -12,10 +12,10 @@ impl Callable for TypeCheckOperator<'_> {
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         for x in args.iter() {
             if !self.1(&x.compute(env, scope)?) {
-                return Ok(RValue::Atom(RAtom::Number(0.0)));
+                return Ok(0.0.into());
             }
         }
-        Ok(RValue::Atom(RAtom::Number(1.0)))
+        Ok(1.0.into())
     }
 }
 

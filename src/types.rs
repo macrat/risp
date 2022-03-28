@@ -86,13 +86,9 @@ impl From<RValue> for RError {
 impl From<RError> for RValue {
     fn from(err: RError) -> RValue {
         match err {
-            RError::System(category, detail) => RValue::List(RList::from(
-                &[
-                    RValue::Atom(RAtom::String(category)),
-                    RValue::Atom(RAtom::String(detail)),
-                ],
-                None,
-            )),
+            RError::System(category, detail) => {
+                RValue::List(RList::from(&[category.into(), detail.into()], None))
+            }
             RError::User(obj) => obj.clone(),
         }
     }
@@ -137,6 +133,24 @@ impl fmt::Display for RAtom {
             RAtom::Number(value) => write!(f, "{}", value),
             RAtom::String(value) => write!(f, "{:?}", value),
         }
+    }
+}
+
+impl From<String> for RAtom {
+    fn from(s: String) -> RAtom {
+        RAtom::String(s)
+    }
+}
+
+impl From<&str> for RAtom {
+    fn from(s: &str) -> RAtom {
+        RAtom::String(s.into())
+    }
+}
+
+impl From<f64> for RAtom {
+    fn from(f: f64) -> RAtom {
+        RAtom::Number(f)
     }
 }
 
@@ -365,7 +379,7 @@ impl Callable for RFunc {
 
                 let local = capture.child();
                 for (name, value) in arg_names.iter().zip(args.0) {
-                    local.define(String::from(name), value.compute(env, scope)?)?;
+                    local.define(name.into(), value.compute(env, scope)?)?;
                 }
 
                 body.compute_last(env, &local)
@@ -483,5 +497,23 @@ impl std::cmp::PartialEq for RValue {
             (RValue::Func(a), RValue::Func(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
+    }
+}
+
+impl From<String> for RValue {
+    fn from(s: String) -> RValue {
+        RValue::Atom(s.into())
+    }
+}
+
+impl From<&str> for RValue {
+    fn from(s: &str) -> RValue {
+        RValue::Atom(s.into())
+    }
+}
+
+impl From<f64> for RValue {
+    fn from(f: f64) -> RValue {
+        RValue::Atom(f.into())
     }
 }

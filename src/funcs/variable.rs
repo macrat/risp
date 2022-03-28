@@ -14,14 +14,14 @@ impl Callable for Def {
         if args.len() != 2 {
             return Err(RError::argument(format!(
                 "`def` needs exact 2 arguments but got `{}`.",
-                args
+                args,
             )));
         }
 
         let value = args[1].compute(env, scope)?;
 
         if let RValue::Atom(RAtom::Symbol(name)) = &args[0] {
-            scope.define(String::from(name), value.clone())?;
+            scope.define(name.into(), value.clone())?;
             Ok(value)
         } else {
             Err(RError::type_(format!(
@@ -43,7 +43,7 @@ impl Callable for Set {
         let value = args[1].compute(env, scope)?;
 
         if let RValue::Atom(RAtom::Symbol(name)) = &args[0] {
-            scope.set(String::from(name), value.clone())?;
+            scope.set(name.into(), value.clone())?;
             Ok(value)
         } else {
             Err(RError::type_(format!(
