@@ -1,0 +1,35 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./test.risp") assert))
+
+(do "tests of `number`"
+  (assert = 123 (number 123))
+  (assert = 123 (number "123"))
+  (assert = 123.456 (number "123.456"))
+
+  (try-catch (func (err trace)
+                   (assert = err (list "incompatible type" "can not convert `()` to number.")))
+             (number ()))
+
+  (try-catch (func (err trace)
+                   (assert = err (list "incompatible type" "can not convert `(123)` to number.")))
+             (number (list 123)))
+
+  (try-catch (func (err trace)
+                   (assert = err (list "incompatible type" "`hello` is not valid number.")))
+             (number "hello"))
+)
+
+(do "tests of `string`"
+  (assert = "hello" (string "hello"))
+  (assert = "123" (string 123))
+  (assert = "123.456" (string 123.456))
+  (assert = "(\"hello\" (4 2))" (string (list "hello" (list 4 2))))
+)
+
+(do "tests of `literal`"
+  (assert = "\"hello\"" (literal "hello"))
+  (assert = "123" (literal 123))
+  (assert = "123.456" (literal 123.456))
+  (assert = "(\"hello\" (4 2))" (literal (list "hello" (list 4 2))))
+)

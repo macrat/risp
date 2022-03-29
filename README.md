@@ -90,10 +90,13 @@ $ cargo run
 - `(fold list function)`: apply each values in the list to the function, and accumulate result. the function's signature is `(func (accumulated-value current-value))`.
 
 ### type
-- `(is-number values...)`: check the values are numbers.
-- `(is-string values...)`: check the values are strings.
-- `(is-list values...)`: check the values are lists.
-- `(is-func values...)`: check the values are functions.
+- `(number value)`: convert value to a number.
+- `(string value)`: convert value to a string.
+- `(literal value)`: convert value to a Risp code literal. it works like python's `repr`.
+- `(is-number values...)`: check all values are numbers.
+- `(is-string values...)`: check all values are strings.
+- `(is-list values...)`: check all values are lists.
+- `(is-func values...)`: check all values are functions.
 
 ### io
 - `(import string)`: import module from file.

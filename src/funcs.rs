@@ -52,6 +52,10 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "println", binary_func!(io::PRINTLN));
 
     // type
+    register!(scope, "number", binary_func!(types::ToNumber));
+    register!(scope, "string", binary_func!(types::ToString));
+    register!(scope, "literal", binary_func!(types::ToLiteral));
+
     register!(scope, "is-number", binary_func!(types::IS_NUMBER));
     register!(scope, "is-string", binary_func!(types::IS_STRING));
     register!(scope, "is-list", binary_func!(types::IS_LIST));

@@ -184,7 +184,7 @@ impl RList {
             Ok(first) => match &first {
                 RValue::Func(func) => {
                     let args = RList::from(&self.0[1..], None);
-                    func.arg_check(&args)?;
+                    func.arg_rule().check(&self.0[0].to_string(), &args)?;
                     match func.call(env, scope, args) {
                         Ok(x) => {
                             env.trace.pop();
@@ -331,7 +331,7 @@ pub enum ArgumentRule {
 }
 
 impl ArgumentRule {
-    pub fn check(&self, name: &str, args: &RList) -> Result<(), RError> {
+    pub fn check(&self, name: &String, args: &RList) -> Result<(), RError> {
         let len = args.len();
         match *self {
             ArgumentRule::Exact(n) if len != n => Err(RError::argument(format!(
@@ -364,10 +364,6 @@ pub trait Callable {
     fn arg_rule(&self) -> ArgumentRule;
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError>;
-
-    fn arg_check(&self, args: &RList) -> Result<(), RError> {
-        self.arg_rule().check(self.name(), args)
-    }
 }
 
 impl fmt::Display for dyn Callable {
