@@ -114,7 +114,7 @@ mod test {
         #[test]
         fn plus() {
             assert_err(
-                RError::argument("`+` needs at least 1 value.".into()),
+                RError::argument("`+` needs at least 1 arguments but got 0.".into()),
                 "(+)",
             );
 
@@ -140,7 +140,7 @@ mod test {
         #[test]
         fn minus() {
             assert_err(
-                RError::argument("`-` needs at least 1 value.".into()),
+                RError::argument("`-` needs at least 1 arguments but got 0.".into()),
                 "(-)",
             );
             assert_atom((-1.0).into(), "(- 1)");
@@ -152,11 +152,11 @@ mod test {
         #[test]
         fn multiply() {
             assert_err(
-                RError::argument("`*` needs at least 2 values.".into()),
+                RError::argument("`*` needs at least 2 arguments but got 0.".into()),
                 "(*)",
             );
             assert_err(
-                RError::argument("`*` needs at least 2 values.".into()),
+                RError::argument("`*` needs at least 2 arguments but got 1.".into()),
                 "(* 1)",
             );
             assert_atom(2.0.into(), "(* 1 2)");
@@ -166,11 +166,11 @@ mod test {
         #[test]
         fn divide() {
             assert_err(
-                RError::argument("`/` needs at least 2 values.".into()),
+                RError::argument("`/` needs at least 2 arguments but got 0.".into()),
                 "(/)",
             );
             assert_err(
-                RError::argument("`/` needs at least 2 values.".into()),
+                RError::argument("`/` needs at least 2 arguments but got 1.".into()),
                 "(/ 1)",
             );
             assert_atom(2.5.into(), "(/ 5 2)");

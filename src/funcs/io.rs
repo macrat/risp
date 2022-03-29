@@ -10,14 +10,11 @@ impl Callable for Import {
         "import"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 1 {
-            return Err(RError::argument(format!(
-                "`import` needs exact 1 argument but got `{}`.",
-                args
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(1)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let name = match args[0].compute(env, scope)? {
             RValue::Atom(RAtom::String(x)) => x,
             x => {
@@ -38,6 +35,10 @@ pub struct PrintFunc<'a>(&'a str, &'a str);
 impl Callable for PrintFunc<'_> {
     fn name(&self) -> &str {
         self.0
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Any
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {

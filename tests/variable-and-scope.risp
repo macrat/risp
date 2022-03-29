@@ -35,3 +35,17 @@
           (assert = err (list "already exist" "x is already exist.")))
     (def x 1)
     (def x 2)))
+
+(do
+  (try-catch
+    (func (err trace)
+          (assert = err (list "unmatched arguments" "`def` needs exact 2 arguments but got 1.")))
+
+    (def a)))
+
+(do
+  (try-catch
+    (func (err trace)
+          (assert = err (list "unmatched arguments" "`set` needs exact 2 arguments but got 3.")))
+
+    (set a b c)))

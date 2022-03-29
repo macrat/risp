@@ -10,14 +10,11 @@ impl Callable for Def {
         "def"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 2 {
-            return Err(RError::argument(format!(
-                "`def` needs exact 2 arguments but got `{}`.",
-                args,
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let value = args[1].compute(env, scope)?;
 
         if let RValue::Atom(RAtom::Symbol(name)) = &args[0] {
@@ -37,6 +34,10 @@ pub struct Set;
 impl Callable for Set {
     fn name(&self) -> &str {
         "set"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {

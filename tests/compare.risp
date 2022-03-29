@@ -117,3 +117,17 @@
   (assert = 1 (>= (list 1 2 3) (list 1 2 3)))
   (assert = 1 (>= (list 1 2 3 4) (list 1 2 3)))
 )
+
+(do
+  (try-catch
+    (func (err trace)
+          (assert = err (list "unmatched arguments" "`>` needs at least 2 arguments but got 0.")))
+
+    (>)))
+
+(do
+  (try-catch
+    (func (err trace)
+          (assert = err (list "unmatched arguments" "`>` needs at least 2 arguments but got 1.")))
+
+    (> 1)))

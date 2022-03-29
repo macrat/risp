@@ -10,14 +10,11 @@ impl Callable for If {
         "if"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 2 && args.len() != 3 {
-            return Err(RError::argument(format!(
-                "`if` requires 2 or 3 arguments but got {} arguments.",
-                args.len(),
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Or(2, 3)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let cond = args[0].compute(env, scope)?.as_bool();
 
         if cond {
@@ -38,14 +35,11 @@ impl Callable for While {
         "while"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() == 0 {
-            return Err(RError::argument(format!(
-                "`while` needs 1 or more arguments but got {}.",
-                args,
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(1)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let local = scope.child();
         let mut result = RValue::nil();
 
@@ -69,6 +63,10 @@ impl Callable for Do {
         "do"
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Any
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         args.compute_last(env, &scope.child())
     }
@@ -82,15 +80,16 @@ impl Callable for Throw {
         "throw"
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Or(0, 1)
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        match args.len() {
-            0 => Err(RValue::nil().into()),
-            1 => Err(args[0].compute(env, scope)?.into()),
-            _ => Err(RError::argument(format!(
-                "`throw` needs 0 or 1 argument but got {}",
-                args,
-            ))),
-        }
+        Err(if args.len() == 0 {
+            RValue::nil().into()
+        } else {
+            args[0].compute(env, scope)?.into()
+        })
     }
 }
 
@@ -102,14 +101,11 @@ impl Callable for TryCatch {
         "try-catch"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() < 2 {
-            return Err(RError::argument(format!(
-                "`try-catch` needs at least 2 arguments but got {}",
-                args,
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(2)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let func = match args[0].compute(env, scope)? {
             RValue::Func(func) => func,
             x => {

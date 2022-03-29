@@ -5,11 +5,15 @@ use crate::scope::Scope;
 use crate::types::*;
 
 #[derive(Debug)]
-pub struct CalculateOperator<'a>(&'a str, fn(Vec<RValue>) -> Result<RValue, RError>);
+pub struct CalculateOperator<'a>(&'a str, usize, fn(Vec<RValue>) -> Result<RValue, RError>);
 
 impl Callable for CalculateOperator<'_> {
     fn name(&self) -> &str {
         self.0
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(self.1)
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
@@ -17,15 +21,11 @@ impl Callable for CalculateOperator<'_> {
         for x in args.iter() {
             xs.push(x.compute(env, scope)?);
         }
-        self.1(xs)
+        self.2(xs)
     }
 }
 
-pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
-    if xs.len() == 0 {
-        return Err(RError::argument("`+` needs at least 1 value.".into()));
-    }
-
+pub const ADD: CalculateOperator = CalculateOperator("+", 1, |xs| {
     if let RValue::Atom(RAtom::String(_)) = xs[0] {
         let mut result = String::new();
         for x in xs {
@@ -49,16 +49,14 @@ pub const ADD: CalculateOperator = CalculateOperator("+", |xs| {
     }
 });
 
-pub const SUB: CalculateOperator = CalculateOperator("-", |xs| match xs.len() {
-    0 => Err(RError::argument("`-` needs at least 1 value.".into())),
-    1 => {
+pub const SUB: CalculateOperator = CalculateOperator("-", 1, |xs| {
+    if xs.len() == 1 {
         if let RValue::Atom(RAtom::Number(x)) = xs[0] {
             Ok((-x).into())
         } else {
             Err(RError::type_(format!("`-` can not apply to {}", xs[0])))
         }
-    }
-    _ => {
+    } else {
         let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
             x
         } else {
@@ -77,11 +75,7 @@ pub const SUB: CalculateOperator = CalculateOperator("-", |xs| match xs.len() {
     }
 });
 
-pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
-    if xs.len() < 2 {
-        return Err(RError::argument("`*` needs at least 2 values.".into()));
-    }
-
+pub const MULTIPLY: CalculateOperator = CalculateOperator("*", 2, |xs| {
     let mut result = 1.0;
     for x in xs {
         if let RValue::Atom(RAtom::Number(x)) = x {
@@ -93,11 +87,7 @@ pub const MULTIPLY: CalculateOperator = CalculateOperator("*", |xs| {
     Ok(result.into())
 });
 
-pub const DIVIDE: CalculateOperator = CalculateOperator("/", |xs| {
-    if xs.len() < 2 {
-        return Err(RError::argument("`/` needs at least 2 values.".into()));
-    }
-
+pub const DIVIDE: CalculateOperator = CalculateOperator("/", 2, |xs| {
     let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
         x
     } else {
@@ -122,14 +112,11 @@ impl Callable for CompareOperator<'_> {
         self.0
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() < 2 {
-            return Err(RError::argument(format!(
-                "`{}` needs at least 2 values.",
-                self.0,
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(2)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let mut x = args[0].compute(env, scope)?;
 
         for y in &args[1..] {
@@ -161,14 +148,11 @@ impl Callable for Not {
         "not"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 1 {
-            return Err(RError::argument(format!(
-                "`not` needs exact 1 argument but got `{}`.",
-                args,
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(1)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let result = if args[0].compute(env, scope)?.as_bool() {
             0.0
         } else {

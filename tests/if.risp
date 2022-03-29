@@ -48,3 +48,17 @@
     (set result 1)
     (set result 2))
   (assert = 2 result))
+
+(do
+  (try-catch
+    (func (err trace)
+          (assert = err (list "unmatched arguments" "`if` needs 2 or 3 arguments but got 1.")))
+
+    (if 1)))
+
+(do
+  (try-catch
+    (func (err trace)
+          (assert = err (list "unmatched arguments" "`if` needs 2 or 3 arguments but got 4.")))
+
+    (if 1 2 3 4)))

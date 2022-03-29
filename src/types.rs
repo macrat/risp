@@ -35,7 +35,7 @@ impl RError {
     }
 
     pub fn argument(reason: String) -> RError {
-        RError::System("invalid argument".to_string(), reason)
+        RError::System("unmatched arguments".to_string(), reason)
     }
 
     pub fn incompleted(buf: String) -> RError {
@@ -183,7 +183,9 @@ impl RList {
         match self.0[0].compute(env, scope) {
             Ok(first) => match &first {
                 RValue::Func(func) => {
-                    match func.call(env, scope, RList::from(&self.0[1..], None)) {
+                    let args = RList::from(&self.0[1..], None);
+                    func.arg_check(&args)?;
+                    match func.call(env, scope, args) {
                         Ok(x) => {
                             env.trace.pop();
                             Ok(x)
@@ -191,7 +193,7 @@ impl RList {
                         Err(err) => Err(err),
                     }
                 }
-                _ => Err(RError::type_(format!("`{}` is not a function.", first))),
+                _ => Err(RError::type_(format!("{:?} is not a function.", first))),
             },
             Err(err) => Err(err),
         }
@@ -320,10 +322,52 @@ impl Index<RangeFrom<usize>> for RList {
     }
 }
 
+#[derive(Debug)]
+pub enum ArgumentRule {
+    Exact(usize),
+    Or(usize, usize),
+    AtLeast(usize),
+    Any,
+}
+
+impl ArgumentRule {
+    pub fn check(&self, name: &str, args: &RList) -> Result<(), RError> {
+        let len = args.len();
+        match *self {
+            ArgumentRule::Exact(n) if len != n => Err(RError::argument(format!(
+                "`{}` needs exact {} arguments but got {}.",
+                name,
+                n,
+                args.len(),
+            ))),
+            ArgumentRule::Or(n, m) if len != n && len != m => Err(RError::argument(format!(
+                "`{}` needs {} or {} arguments but got {}.",
+                name,
+                n,
+                m,
+                args.len(),
+            ))),
+            ArgumentRule::AtLeast(n) if len < n => Err(RError::argument(format!(
+                "`{}` needs at least {} arguments but got {}.",
+                name,
+                n,
+                args.len(),
+            ))),
+            _ => Ok(()),
+        }
+    }
+}
+
 pub trait Callable {
     fn name(&self) -> &str;
 
+    fn arg_rule(&self) -> ArgumentRule;
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError>;
+
+    fn arg_check(&self, args: &RList) -> Result<(), RError> {
+        self.arg_rule().check(self.name(), args)
+    }
 }
 
 impl fmt::Display for dyn Callable {
@@ -362,6 +406,13 @@ impl Callable for RFunc {
         }
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        match self {
+            RFunc::Pure { args, .. } => ArgumentRule::Exact(args.len()),
+            RFunc::Binary(func) => func.arg_rule(),
+        }
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         match self {
             RFunc::Pure {
@@ -369,14 +420,6 @@ impl Callable for RFunc {
                 body,
                 capture,
             } => {
-                if args.0.len() != arg_names.len() {
-                    return Err(RError::argument(format!(
-                        "this function needs {} arguments but got {} arguments.",
-                        arg_names.len(),
-                        args.0.len()
-                    )));
-                }
-
                 let local = capture.child();
                 for (name, value) in arg_names.iter().zip(args.0) {
                     local.define(name.into(), value.compute(env, scope)?)?;

@@ -13,13 +13,11 @@ impl Callable for Func {
         "func"
     }
 
-    fn call(&self, _: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() == 0 {
-            return Err(RError::argument(
-                "`func` needs at least 1 argument but got no argument.".into(),
-            ));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(1)
+    }
 
+    fn call(&self, _: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         Ok(RValue::Func(Rc::new(RFunc::Pure {
             args: match &args[0] {
                 RValue::List(list) => {

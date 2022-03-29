@@ -10,6 +10,10 @@ impl Callable for List {
         "list"
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Any
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         Ok(RValue::List(args.compute_each(env, scope)?))
     }
@@ -23,24 +27,21 @@ impl Callable for Car {
         "car"
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(1)
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 1 {
-            Err(RError::argument(format!(
-                "`car` needs exact 1 argument but got {} arguments",
-                args.len(),
-            )))
-        } else {
-            match args[0].compute(env, scope)? {
-                RValue::List(list) => Ok(list[0].clone()),
-                RValue::Atom(RAtom::String(x)) => match x.chars().next() {
-                    Some(c) => Ok(c.to_string().into()),
-                    None => Ok("".into()),
-                },
-                x => Err(RError::type_(format!(
-                    "`car` needs list or string but got {}",
-                    x,
-                ))),
-            }
+        match args[0].compute(env, scope)? {
+            RValue::List(list) => Ok(list[0].clone()),
+            RValue::Atom(RAtom::String(x)) => match x.chars().next() {
+                Some(c) => Ok(c.to_string().into()),
+                None => Ok("".into()),
+            },
+            x => Err(RError::type_(format!(
+                "`car` needs list or string but got {}",
+                x,
+            ))),
         }
     }
 }
@@ -53,25 +54,22 @@ impl Callable for Cdr {
         "cdr"
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(1)
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 1 {
-            Err(RError::argument(format!(
-                "`cdr` needs exact 1 argument but got {} arguments",
-                args.len(),
-            )))
-        } else {
-            match args[0].compute(env, scope)? {
-                RValue::List(list) => Ok(RValue::List(RList::from(&list[1..], None))),
-                RValue::Atom(RAtom::String(x)) => {
-                    let mut chars = x.chars();
-                    chars.next();
-                    Ok(chars.as_str().into())
-                }
-                x => Err(RError::type_(format!(
-                    "`cdr` needs list or string but got {}",
-                    x,
-                ))),
+        match args[0].compute(env, scope)? {
+            RValue::List(list) => Ok(RValue::List(RList::from(&list[1..], None))),
+            RValue::Atom(RAtom::String(x)) => {
+                let mut chars = x.chars();
+                chars.next();
+                Ok(chars.as_str().into())
             }
+            x => Err(RError::type_(format!(
+                "`cdr` needs list or string but got {}",
+                x,
+            ))),
         }
     }
 }
@@ -84,14 +82,11 @@ impl Callable for Seq {
         "seq"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 1 && args.len() != 2 {
-            return Err(RError::argument(format!(
-                "`seq` needs 1 or 2 number argument but got {}",
-                args
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Or(1, 2)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let args = args.compute_each(env, scope)?;
 
         let to = match &args[args.len() - 1] {
@@ -144,14 +139,11 @@ impl Callable for Map {
         "map"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 2 {
-            return Err(RError::argument(format!(
-                "`map` needs exact 2 arguments but got {}.",
-                args
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let list = match args[0].compute(env, scope)? {
             RValue::List(xs) => xs,
             x => {
@@ -190,14 +182,11 @@ impl Callable for Fold {
         "fold"
     }
 
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 2 {
-            return Err(RError::argument(format!(
-                "`fold` needs exact 2 arguments but got {}.",
-                args
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
+    }
 
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         let list = match args[0].compute(env, scope)? {
             RValue::List(xs) if xs.len() >= 2 => xs,
             RValue::List(xs) => {

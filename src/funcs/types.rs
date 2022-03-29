@@ -9,6 +9,10 @@ impl Callable for TypeCheckOperator<'_> {
         self.0
     }
 
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(1)
+    }
+
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         for x in args.iter() {
             if !self.1(&x.compute(env, scope)?) {

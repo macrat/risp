@@ -75,15 +75,11 @@ impl Callable for Module {
         self.name.as_str()
     }
 
-    fn call(&self, env: &mut Env, _: &Scope, args: RList) -> Result<RValue, RError> {
-        if args.len() != 1 {
-            return Err(RError::argument(format!(
-                "{} needs exact 1 argument but got {}.",
-                self.name(),
-                args,
-            )));
-        }
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(1)
+    }
 
+    fn call(&self, env: &mut Env, _: &Scope, args: RList) -> Result<RValue, RError> {
         args[0].compute(env, &mut self.scope.clone())
     }
 }
