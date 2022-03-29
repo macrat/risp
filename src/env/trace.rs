@@ -54,8 +54,8 @@ impl Trace {
     pub fn print(&self, err: RError) {
         for x in &self.stack {
             match x.position() {
-                Some(pos) => println!("! {} {}", pos, x),
-                None => println!("! <dynamic>:0:0 {}", x),
+                Some(pos) => println!("! {}\n  {}", pos, x),
+                None => println!("! <dynamic>:0:0\n  {}", x),
             }
         }
         println!("! {}", err);

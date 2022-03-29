@@ -193,7 +193,7 @@ impl RList {
                         Err(err) => Err(err),
                     }
                 }
-                _ => Err(RError::type_(format!("{:?} is not a function.", first))),
+                _ => Err(RError::type_(format!("`{}` is not a function.", first))),
             },
             Err(err) => Err(err),
         }

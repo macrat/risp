@@ -1,0 +1,19 @@
+" vim: set ft=lisp : "
+
+(def assert ((import "./test.risp") assert))
+
+(do "tests for map"
+  (assert = (list 2 4 6) (map (list 1 2 3) (func (x) (* x 2))))
+
+  (assert =
+          (list "a" "b")
+          (map (list (list "a" 1) (list "b" 2))
+               car)))
+
+(do "tests for fold"
+  (assert = 15 (fold (list 1 2 3 4 5) +))
+
+  (assert =
+          "ab"
+          (map (list (list "a" 1) (list "b" 2))
+               (func (acc cur) (+ acc (car cur))))))
