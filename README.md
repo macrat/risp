@@ -91,7 +91,7 @@ $ cargo run
 
 ### type
 - `(number value)`: convert value to a number.
-- `(string value)`: convert value to a string.
+- `(string values...)`: convert values to a string.
 - `(literal value)`: convert value to a Risp code literal. it works like python's `repr`.
 - `(is-number values...)`: check all values are numbers.
 - `(is-string values...)`: check all values are strings.
@@ -100,8 +100,9 @@ $ cargo run
 
 ### io
 - `(import string)`: import module from file.
-- `(print values...)`: print `values` without `\n`.
-- `(println values...)`: print `values` with `\n`.
+- `(stdout value)` or `(stderr value)`: write `value` into stdout or stderr.
+- `(print values...)`: print `values` to stdout without `\n`. this is the same as `(stdout (string values...))`.
+- `(println values...)`: print `values` to stdout with `\n`. this is the same as `(stdout (+ (string values...) "\n"))`.
 
 ### operator
 - `(+ numbers-or-strings...)`: add numbers, or join strings.

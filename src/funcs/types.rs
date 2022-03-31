@@ -34,11 +34,11 @@ impl Callable for ToString {
     }
 
     fn arg_rule(&self) -> ArgumentRule {
-        ArgumentRule::Exact(1)
+        ArgumentRule::Any
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        Ok(args[0].compute(env, scope)?.to_printable().into())
+        Ok(args.compute_each(env, scope)?.to_bare_printable().into())
     }
 }
 

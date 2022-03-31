@@ -48,6 +48,8 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
 
     // io
     register!(scope, "import", binary_func!(io::Import));
+    register!(scope, "stdout", binary_func!(io::stdout()));
+    register!(scope, "stderr", binary_func!(io::stderr()));
     register!(scope, "print", binary_func!(io::PRINT));
     register!(scope, "println", binary_func!(io::PRINTLN));
 

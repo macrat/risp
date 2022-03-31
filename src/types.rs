@@ -187,7 +187,7 @@ impl RList {
         }
     }
 
-    fn compute_call(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
+    pub fn compute_call(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
         env.trace.push(self.clone());
 
         match self.1[0].compute(env, scope) {
