@@ -1,7 +1,0 @@
-" simple Hello World in Risp "
-" vim: set ft=lisp :"
-
-(def hello-world (func ()
-  (println "hello world!")))
-
-(hello-world)

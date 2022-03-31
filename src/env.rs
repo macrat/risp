@@ -24,12 +24,14 @@ impl Env {
             return Ok(module);
         }
 
-        self.modules.define(name.clone(), RValue::nil())?;
+        let mut module = module::Module::new(name.clone(), scope.root().child());
 
-        let module = module::Module::load(self, scope.root().child(), name.clone())?;
-        let module = RValue::Func(Rc::new(RFunc::Binary(Box::new(module))));
+        let modfunc = RValue::Func(Rc::new(RFunc::Binary(Box::new(module.clone()))));
+        self.modules.define(name.clone(), modfunc.clone())?;
 
-        self.modules.set(name, module.clone())?;
-        Ok(module)
+        module.load(self)?;
+
+        self.modules.set(name, modfunc.clone())?;
+        Ok(modfunc)
     }
 }

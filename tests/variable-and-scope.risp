@@ -1,51 +1,54 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./test.risp") assert))
+(def test (import "./test.risp"))
+(def assert (test assert))
 
-(do
-  (def x 42)
-  (assert = x 42))
+((test case)
+ "valid"
+ (func ()
+       (do
+         (def x 42)
+         (assert = x 42))
 
-(do
-  (def x (+ 1 2))
-  (assert = x 3))
+       (do
+         (def x (+ 1 2))
+         (assert = x 3))
 
-(do
-  (def x 1)
-  (assert = x 1)
-  (set x 2)
-  (assert = x 2))
+       (do
+         (def x 1)
+         (assert = x 1)
+         (set x 2)
+         (assert = x 2))
 
-(do
-  (def x "a")
-  (do
-    (def x "b")
-    (assert = x "b"))
-  (assert = x "a"))
+       (do
+         (def x "a")
+         (do
+           (def x "b")
+           (assert = x "b"))
+         (assert = x "a"))))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "not exist" "x does not exist.")))
-    (set x 42)))
+((test case)
+ "invalid"
+ (func ()
+       (try-catch
+         (func (err trace)
+               (assert = err (list "not exist" "x does not exist.")))
+         (set x 42))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "already exist" "x is already exist.")))
-    (def x 1)
-    (def x 2)))
+       (try-catch
+         (func (err trace)
+               (assert = err (list "already exist" "x is already exist.")))
+         (def x 1)
+         (def x 2))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "unmatched arguments" "`def` needs exact 2 arguments but got 1.")))
+       (try-catch
+         (func (err trace)
+               (assert = err (list "unmatched arguments" "`def` needs exact 2 arguments but got 1.")))
 
-    (def a)))
+         (def a))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "unmatched arguments" "`set` needs exact 2 arguments but got 3.")))
+       (try-catch
+         (func (err trace)
+               (assert = err (list "unmatched arguments" "`set` needs exact 2 arguments but got 3.")))
 
-    (set a b c)))
+         (set a b c))))

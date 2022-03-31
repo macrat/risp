@@ -1,12 +1,32 @@
-" Utilities for test "
 " vim: set ft=lisp : "
 
 (def assert (func (operator wanted actual)
-  (if (not (operator wanted actual))
-    (throw (list "assertion unsatisfied" (list operator wanted actual))))))
+                  (if (not (operator wanted actual))
+                    (throw (list "assertion unsatisfied" (list operator wanted actual))))))
 
-(assert = 1 1)
+(def print-traceback
+     (func (err trace)
+           (while (cdr (cdr trace))
+                  (println " " (fold (car trace) (func (acc cur) (+ acc ": " (string cur)))))
+                  (set trace (cdr trace)))
+           (println)
+           (println err)))
 
-(try-catch (func (err trace)
-                 (assert = err (list "assertion unsatisfied" (list = 1 2))))
-           (assert = 1 2))
+(def passed 0)
+(def failed 0)
+(def prefix "")
+
+(def case (func (name fun)
+                (try-catch (func (err trace)
+                                 (set prefix old-prefix)
+                                 (set failed (+ failed 1))
+                                 (println (+ prefix name " ... failure"))
+                                 (println)
+                                 (print-traceback err trace)
+                                 (println))
+                           (def old-prefix prefix)
+                           (set prefix (+ prefix name " / "))
+                           (fun)
+                           (set passed (+ passed 1))
+                           (set prefix old-prefix)
+                           (println (+ prefix name " ... ok")))))

@@ -1,133 +1,141 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./test.risp") assert))
+(def test (import "./test.risp"))
+(def assert (test assert))
 
-(do "tests of `=`"
-  (assert = 1 (= 1 1))
-  (assert = 0 (= 1 2))
+((test case)
+ "="
+ (func ()
+       (assert = 1 (= 1 1))
+       (assert = 0 (= 1 2))
 
-  (assert = 1 (= "hello" "hello"))
-  (assert = 0 (= "hello" "world"))
+       (assert = 1 (= "hello" "hello"))
+       (assert = 0 (= "hello" "world"))
 
-  (assert = 1 (= (list 1 2 3) (list 1 2 3)))
-  (assert = 0 (= (list 1 2 4) (list 1 2 3)))
-  (assert = 0 (= (list 1 2 3 4) (list 1 2 3)))
-  (assert = 0 (= (list 1 2 3) (list 1 2 3 4)))
-  (assert = 1 (= () (list)))
+       (assert = 1 (= (list 1 2 3) (list 1 2 3)))
+       (assert = 0 (= (list 1 2 4) (list 1 2 3)))
+       (assert = 0 (= (list 1 2 3 4) (list 1 2 3)))
+       (assert = 0 (= (list 1 2 3) (list 1 2 3 4)))
+       (assert = 1 (= () (list)))
 
-  (assert = 1 (= println println))
-  (assert = 0 (= println print))
+       (assert = 1 (= println println))
+       (assert = 0 (= println print))
 
-  (assert = 1 (= (def f1 (func ())) f1))
-  (def f2 (func ()))
-  (assert = 1 (= f2 f2))
-  (assert = 0 (= f2 (func ())))
-)
+       (assert = 1 (= (def f1 (func ())) f1))
+       (def f2 (func ()))
+       (assert = 1 (= f2 f2))
+       (assert = 0 (= f2 (func ())))))
 
-(do "tests of `!=`"
-  (assert = 0 (!= 1 1))
-  (assert = 1 (!= 1 2))
+((test case)
+ "!="
+ (func ()
+       (assert = 0 (!= 1 1))
+       (assert = 1 (!= 1 2))
 
-  (assert = 0 (!= "hello" "hello"))
-  (assert = 1 (!= "hello" "world"))
+       (assert = 0 (!= "hello" "hello"))
+       (assert = 1 (!= "hello" "world"))
 
-  (assert = 0 (!= (list 1 2 3) (list 1 2 3)))
-  (assert = 1 (!= (list 1 2 4) (list 1 2 3)))
-  (assert = 1 (!= (list 1 2 3 4) (list 1 2 3)))
-  (assert = 1 (!= (list 1 2 3) (list 1 2 3 4)))
-  (assert = 0 (!= () (list)))
+       (assert = 0 (!= (list 1 2 3) (list 1 2 3)))
+       (assert = 1 (!= (list 1 2 4) (list 1 2 3)))
+       (assert = 1 (!= (list 1 2 3 4) (list 1 2 3)))
+       (assert = 1 (!= (list 1 2 3) (list 1 2 3 4)))
+       (assert = 0 (!= () (list)))
 
-  (assert = 0 (!= println println))
-  (assert = 1 (!= println print))
+       (assert = 0 (!= println println))
+       (assert = 1 (!= println print))
 
-  (assert = 0 (!= (def f1 (func ())) f1))
-  (def f2 (func ()))
-  (assert = 0 (!= f2 f2))
-  (assert = 1 (!= f2 (func ())))
-)
+       (assert = 0 (!= (def f1 (func ())) f1))
+       (def f2 (func ()))
+       (assert = 0 (!= f2 f2))
+       (assert = 1 (!= f2 (func ())))))
 
-(do "tests of `<`"
-  (assert = 1 (< 1 2))
-  (assert = 0 (< 2 2))
-  (assert = 0 (< 3 2))
+((test case)
+ "<"
+ (func ()
+       (assert = 1 (< 1 2))
+       (assert = 0 (< 2 2))
+       (assert = 0 (< 3 2))
 
-  (assert = 1 (< 1 2 3))
-  (assert = 0 (< 1 2 2))
-  (assert = 0 (< 1 2 1))
+       (assert = 1 (< 1 2 3))
+       (assert = 0 (< 1 2 2))
+       (assert = 0 (< 1 2 1))
 
-  (assert = 1 (< (list 1 2 3) (list 2 2 3)))
-  (assert = 0 (< (list 1 2 3) (list 1 2 3)))
-  (assert = 0 (< (list 1 2 3) (list 0 2 3)))
+       (assert = 1 (< (list 1 2 3) (list 2 2 3)))
+       (assert = 0 (< (list 1 2 3) (list 1 2 3)))
+       (assert = 0 (< (list 1 2 3) (list 0 2 3)))
 
-  (assert = 1 (< (list 1 2 3) (list 1 2 3 4)))
-  (assert = 0 (< (list 1 2 3) (list 1 2 3)))
-  (assert = 0 (< (list 1 2 3 4) (list 1 2 3)))
-)
+       (assert = 1 (< (list 1 2 3) (list 1 2 3 4)))
+       (assert = 0 (< (list 1 2 3) (list 1 2 3)))
+       (assert = 0 (< (list 1 2 3 4) (list 1 2 3)))))
 
-(do "tests of `<`"
-  (assert = 1 (<= 1 2))
-  (assert = 1 (<= 2 2))
-  (assert = 0 (<= 3 2))
+((test case)
+ "<="
+ (func ()
+       (assert = 1 (<= 1 2))
+       (assert = 1 (<= 2 2))
+       (assert = 0 (<= 3 2))
 
-  (assert = 1 (<= 1 2 3))
-  (assert = 1 (<= 1 2 2))
-  (assert = 0 (<= 1 2 1))
+       (assert = 1 (<= 1 2 3))
+       (assert = 1 (<= 1 2 2))
+       (assert = 0 (<= 1 2 1))
 
-  (assert = 1 (<= (list 1 2 3) (list 2 2 3)))
-  (assert = 1 (<= (list 1 2 3) (list 1 2 3)))
-  (assert = 0 (<= (list 1 2 3) (list 0 2 3)))
+       (assert = 1 (<= (list 1 2 3) (list 2 2 3)))
+       (assert = 1 (<= (list 1 2 3) (list 1 2 3)))
+       (assert = 0 (<= (list 1 2 3) (list 0 2 3)))
 
-  (assert = 1 (<= (list 1 2 3) (list 1 2 3 4)))
-  (assert = 1 (<= (list 1 2 3) (list 1 2 3)))
-  (assert = 0 (<= (list 1 2 3 4) (list 1 2 3)))
-)
+       (assert = 1 (<= (list 1 2 3) (list 1 2 3 4)))
+       (assert = 1 (<= (list 1 2 3) (list 1 2 3)))
+       (assert = 0 (<= (list 1 2 3 4) (list 1 2 3)))))
 
-(do "tests of `>`"
-  (assert = 0 (> 1 2))
-  (assert = 0 (> 2 2))
-  (assert = 1 (> 3 2))
+((test case)
+ ">"
+ (func ()
+       (assert = 0 (> 1 2))
+       (assert = 0 (> 2 2))
+       (assert = 1 (> 3 2))
 
-  (assert = 0 (> 3 2 3))
-  (assert = 0 (> 3 2 2))
-  (assert = 1 (> 3 2 1))
+       (assert = 0 (> 3 2 3))
+       (assert = 0 (> 3 2 2))
+       (assert = 1 (> 3 2 1))
 
-  (assert = 0 (> (list 1 2 3) (list 2 2 3)))
-  (assert = 0 (> (list 1 2 3) (list 1 2 3)))
-  (assert = 1 (> (list 1 2 3) (list 0 2 3)))
+       (assert = 0 (> (list 1 2 3) (list 2 2 3)))
+       (assert = 0 (> (list 1 2 3) (list 1 2 3)))
+       (assert = 1 (> (list 1 2 3) (list 0 2 3)))
 
-  (assert = 0 (> (list 1 2 3) (list 1 2 3 4)))
-  (assert = 0 (> (list 1 2 3) (list 1 2 3)))
-  (assert = 1 (> (list 1 2 3 4) (list 1 2 3)))
-)
+       (assert = 0 (> (list 1 2 3) (list 1 2 3 4)))
+       (assert = 0 (> (list 1 2 3) (list 1 2 3)))
+       (assert = 1 (> (list 1 2 3 4) (list 1 2 3)))))
 
-(do "tests of `>=`"
-  (assert = 0 (>= 1 2))
-  (assert = 1 (>= 2 2))
-  (assert = 1 (>= 3 2))
+((test case)
+ ">="
+ (func ()
+       (assert = 0 (>= 1 2))
+       (assert = 1 (>= 2 2))
+       (assert = 1 (>= 3 2))
 
-  (assert = 0 (>= 3 2 3))
-  (assert = 1 (>= 3 2 2))
-  (assert = 1 (>= 3 2 1))
+       (assert = 0 (>= 3 2 3))
+       (assert = 1 (>= 3 2 2))
+       (assert = 1 (>= 3 2 1))
 
-  (assert = 0 (>= (list 1 2 3) (list 2 2 3)))
-  (assert = 1 (>= (list 1 2 3) (list 1 2 3)))
-  (assert = 1 (>= (list 1 2 3) (list 0 2 3)))
+       (assert = 0 (>= (list 1 2 3) (list 2 2 3)))
+       (assert = 1 (>= (list 1 2 3) (list 1 2 3)))
+       (assert = 1 (>= (list 1 2 3) (list 0 2 3)))
 
-  (assert = 0 (>= (list 1 2 3) (list 1 2 3 4)))
-  (assert = 1 (>= (list 1 2 3) (list 1 2 3)))
-  (assert = 1 (>= (list 1 2 3 4) (list 1 2 3)))
-)
+       (assert = 0 (>= (list 1 2 3) (list 1 2 3 4)))
+       (assert = 1 (>= (list 1 2 3) (list 1 2 3)))
+       (assert = 1 (>= (list 1 2 3 4) (list 1 2 3)))))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "unmatched arguments" "`>` needs at least 2 arguments but got 0.")))
+((test case)
+ "number of arguments"
+ (func ()
+       (try-catch
+         (func (err trace)
+               (assert = err (list "unmatched arguments" "`>` needs at least 2 arguments but got 0.")))
 
-    (>)))
+         (>))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "unmatched arguments" "`>` needs at least 2 arguments but got 1.")))
+       (try-catch
+         (func (err trace)
+               (assert = err (list "unmatched arguments" "`>` needs at least 2 arguments but got 1.")))
 
-    (> 1)))
+         (> 1))))

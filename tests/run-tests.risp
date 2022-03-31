@@ -1,0 +1,36 @@
+" vim: set ft=lisp : "
+
+(def test (import "./test.risp"))
+
+((test case)
+ "assert"
+ (func ()
+       ((test assert) = 1 1)
+
+       (try-catch (func (err trace)
+                        ((test assert) = err (list "assertion unsatisfied" (list = 1 2))))
+                  ((test assert) = 1 2))))
+
+
+(map
+  (list 
+    "./calc.risp"
+    "./car-cdr.risp"
+    "./compare.risp"
+    "./func.risp"
+    "./higher-order.risp"
+    "./if.risp"
+    "./list.risp"
+    "./seq.risp"
+    "./tarai.risp"
+    "./type-check.risp"
+    "./type-convert.risp"
+    "./variable-and-scope.risp")
+  (func (name)
+        ((test case) name
+                     (func () (import name)))))
+
+(println)
+(println "self test:" (test passed) "passed," (test failed) "failed")
+(if (> (test failed) 0)
+  (throw "self test failed"))

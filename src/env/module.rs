@@ -9,18 +9,27 @@ use crate::types::*;
 
 #[derive(Debug, Clone)]
 pub struct Module {
+    path: String,
     name: String,
     scope: Scope,
 }
 
 impl Module {
+    pub fn new(name: String, scope: Scope) -> Module {
+        Module {
+            name: format!("(import {:?})", name),
+            path: name,
+            scope,
+        }
+    }
+
     fn load_from<T: BufRead>(
+        &mut self,
         env: &mut Env,
-        scope: Scope,
-        name: String,
+        path: String,
         source: T,
-    ) -> Result<Module, RError> {
-        let mut parser = Parser::new(name.clone());
+    ) -> Result<(), RError> {
+        let mut parser = Parser::new(path);
 
         for line in source.lines() {
             match line {
@@ -28,44 +37,46 @@ impl Module {
                     parser.feed(line.as_str())?;
                     parser.feed_char('\n')?;
                 }
-                Err(err) => return Err(RError::io(format!("failed to read {}: {}", name, err))),
+                Err(err) => {
+                    return Err(RError::io(format!("failed to read {}: {}", self.name, err)))
+                }
             };
 
             while let Some(expr) = parser.pop() {
-                expr.compute(env, &scope)?;
+                expr.compute(env, &self.scope)?;
             }
         }
 
         parser.close()?;
 
         while let Some(expr) = parser.pop() {
-            expr.compute(env, &scope)?;
+            expr.compute(env, &self.scope)?;
         }
 
-        Ok(Module {
-            name: format!("(import {:?})", name),
-            scope,
-        })
+        Ok(())
     }
 
-    pub fn load(env: &mut Env, scope: Scope, name: String) -> Result<Module, RError> {
+    pub fn load(&mut self, env: &mut Env) -> Result<(), RError> {
         let cwd = match env.trace.position() {
             Some(p) => p.file,
             None => ".".to_string(),
         };
-        let path = match Path::new(cwd.as_str())
-            .with_file_name(name.clone())
-            .canonicalize()
-        {
+        let raw_path = Path::new(cwd.as_str()).with_file_name(self.path.clone());
+        let path = match raw_path.canonicalize() {
             Ok(p) => match p.to_str() {
                 Some(p) => p.to_string(),
-                None => return Err(RError::io(format!("failed to lookup {}", name))),
+                None => return Err(RError::io(format!("failed to lookup {:?}", raw_path))),
             },
-            Err(err) => return Err(RError::io(format!("failed to lookup {}: {}", name, err))),
+            Err(err) => {
+                return Err(RError::io(format!(
+                    "failed to lookup {:?}: {}",
+                    raw_path, err
+                )))
+            }
         };
         match File::open(path.clone()) {
-            Ok(file) => Module::load_from(env, scope, path, BufReader::new(file)),
-            Err(err) => Err(RError::io(format!("failed to open {}: {}", name, err))),
+            Ok(file) => self.load_from(env, path, BufReader::new(file)),
+            Err(err) => Err(RError::io(format!("failed to open {:?}: {}", path, err))),
         }
     }
 }

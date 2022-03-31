@@ -1,6 +1,7 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./test.risp") assert))
+(def test (import "./test.risp"))
+(def assert (test assert))
 
 (do
   (def result 0)
@@ -49,16 +50,19 @@
     (set result 2))
   (assert = 2 result))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "unmatched arguments" "`if` needs 2 or 3 arguments but got 1.")))
+((test case)
+ "number of arguments"
+ (func ()
+       (do
+         (try-catch
+           (func (err trace)
+                 (assert = err (list "unmatched arguments" "`if` needs 2 or 3 arguments but got 1.")))
 
-    (if 1)))
+           (if 1)))
 
-(do
-  (try-catch
-    (func (err trace)
-          (assert = err (list "unmatched arguments" "`if` needs 2 or 3 arguments but got 4.")))
+       (do
+         (try-catch
+           (func (err trace)
+                 (assert = err (list "unmatched arguments" "`if` needs 2 or 3 arguments but got 4.")))
 
-    (if 1 2 3 4)))
+           (if 1 2 3 4)))))

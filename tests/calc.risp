@@ -1,0 +1,107 @@
+" vim: set ft=lisp : "
+
+(def test (import "./test.risp"))
+(def assert (test assert))
+
+((test case)
+ "+"
+ (func ()
+       ((test case)
+        "missing argument"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "unmatched arguments" "`+` needs at least 1 arguments but got 0.")))
+                (+))))
+
+       ((test case)
+        "number"
+        (func ()
+              (assert = 1 (+ 1))
+              (assert = 3 (+ 1 2))
+              (assert = 15 (+ 1 2 3 4 5))
+              (assert = 15 (+ 1 (+ 2 3) 4 5))))
+
+       ((test case)
+        "string"
+        (func ()
+              (assert = "hello" (+ "hello"))
+              (assert = "helloworld" (+ "hello" "world"))
+              (assert = "hello world" (+ "hello" " " "world"))))
+
+       ((test case)
+        "mismatch type"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`+` can not apply to 123")))
+                (+ "hello" 123))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`+` can not apply to \"hello\"")))
+                (+ 123 "hello"))))))
+
+((test case)
+ "-"
+ (func ()
+       ((test case)
+        "missing argument"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "unmatched arguments" "`-` needs at least 1 arguments but got 0.")))
+                (-))))
+
+       ((test case)
+        "number"
+        (func ()
+              (assert = -1 (- 1))
+              (assert = -1 (- 1 2))
+              (assert = -13 (- 1 2 3 4 5))
+              (assert = -7 (- 1 (- 2 3) 4 5))))))
+
+((test case)
+ "*"
+ (func ()
+       ((test case)
+        "missing argument"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "unmatched arguments" "`*` needs at least 2 arguments but got 0.")))
+                (*))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "unmatched arguments" "`*` needs at least 2 arguments but got 1.")))
+                (* 1))))
+
+       ((test case)
+        "number"
+        (func ()
+              (assert = 2 (* 1 2))
+              (assert = 120 (* 1 2 3 4 5))
+              (assert = -5 (* -1 5))))))
+
+((test case)
+ "/"
+ (func ()
+       ((test case)
+        "missing argument"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "unmatched arguments" "`/` needs at least 2 arguments but got 0.")))
+                (/))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "unmatched arguments" "`/` needs at least 2 arguments but got 1.")))
+                (/ 1))))
+
+       ((test case)
+        "number"
+        (func ()
+              (assert = 2.5 (/ 5 2))
+              (assert = 5 (/ 20 2 2))))))

@@ -1,15 +1,20 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./test.risp") assert))
+(def test (import "./test.risp"))
+(def assert (test assert))
 
-(do "tests for list"
-  (def xs (list 12 34 56))
-  (assert = 12 (car xs))
-  (assert = (list 34 56) (cdr xs))
-  (assert = 34 (car (cdr xs))))
+((test case)
+ "list"
+ (func ()
+       (def xs (list 12 34 56))
+       (assert = 12 (car xs))
+       (assert = (list 34 56) (cdr xs))
+       (assert = 34 (car (cdr xs)))))
 
-(do "tests for string"
-  (def xs "hello")
-  (assert = "h" (car xs))
-  (assert = "e" (car (cdr xs)))
-  (assert = "llo" (cdr (cdr xs))))
+((test case)
+ "tests for string"
+ (func ()
+       (def xs "hello")
+       (assert = "h" (car xs))
+       (assert = "e" (car (cdr xs)))
+       (assert = "llo" (cdr (cdr xs)))))

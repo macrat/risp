@@ -1,0 +1,46 @@
+" vim: set ft=lisp : "
+
+(def test (import "./test.risp"))
+(def assert (test assert))
+
+((test case)
+ "is-number"
+ (func ()
+       (assert = 1 (is-number 2))
+       (assert = 0 (is-number "hello"))
+       (assert = 0 (is-number (list 12 34)))
+       (assert = 0 (is-number if))))
+
+((test case)
+ "is-string"
+ (func ()
+       (assert = 0 (is-string 2))
+       (assert = 1 (is-string "hello"))
+       (assert = 0 (is-string (list 12 34)))
+       (assert = 0 (is-string if))))
+
+((test case)
+ "is-list"
+ (func ()
+       (assert = 0 (is-list 2))
+       (assert = 0 (is-list "hello"))
+       (assert = 1 (is-list (list 12 34)))
+       (assert = 0 (is-list if))))
+
+((test case)
+ "is-func"
+ (func ()
+       (assert = 0 (is-func 2))
+       (assert = 0 (is-func "hello"))
+       (assert = 0 (is-func (list 12 34)))
+       (assert = 1 (is-func if))))
+
+((test case)
+ "multiple values"
+ (func ()
+       (assert = 1 (is-number 1 2 3))
+       (assert = 0 (is-number 1 2 "c"))
+       (assert = 0 (is-number 1 "b" 2))
+       (assert = 0 (is-number "a" 2 2))
+       (assert = 0 (is-number "a" "b" "c"))
+       (assert = 1 (is-string "a" "b" "c"))))
