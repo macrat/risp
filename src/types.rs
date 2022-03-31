@@ -194,7 +194,7 @@ impl RList {
             Ok(first) => match &first {
                 RValue::Func(func) => {
                     let args = RList::new(self.1[1..].into(), None);
-                    func.arg_rule().check(&self.1[0].to_string(), &args)?;
+                    func.arg_rule().check(&self.1[0].to_string(), args.len())?;
                     let result = func.call(env, scope, args)?;
                     env.trace.pop();
                     Ok(result)
@@ -338,27 +338,19 @@ pub enum ArgumentRule {
 }
 
 impl ArgumentRule {
-    pub fn check(&self, name: &String, args: &RList) -> Result<(), RError> {
-        let len = args.len();
+    pub fn check(&self, name: &String, n_args: usize) -> Result<(), RError> {
         match *self {
-            ArgumentRule::Exact(n) if len != n => Err(RError::argument(format!(
+            ArgumentRule::Exact(n) if n_args != n => Err(RError::argument(format!(
                 "`{}` needs exact {} arguments but got {}.",
-                name,
-                n,
-                args.len(),
+                name, n, n_args,
             ))),
-            ArgumentRule::Or(n, m) if len != n && len != m => Err(RError::argument(format!(
+            ArgumentRule::Or(n, m) if n_args != n && n_args != m => Err(RError::argument(format!(
                 "`{}` needs {} or {} arguments but got {}.",
-                name,
-                n,
-                m,
-                args.len(),
+                name, n, m, n_args,
             ))),
-            ArgumentRule::AtLeast(n) if len < n => Err(RError::argument(format!(
+            ArgumentRule::AtLeast(n) if n_args < n => Err(RError::argument(format!(
                 "`{}` needs at least {} arguments but got {}.",
-                name,
-                n,
-                args.len(),
+                name, n, n_args,
             ))),
             _ => Ok(()),
         }

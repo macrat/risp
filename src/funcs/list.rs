@@ -164,6 +164,8 @@ impl Callable for Map {
             }
         };
 
+        func.arg_rule().check(&"map function".to_string(), 1)?;
+
         let mut result = RList::empty(None);
 
         for x in list.iter() {
@@ -212,6 +214,8 @@ impl Callable for Fold {
                 )))
             }
         };
+
+        func.arg_rule().check(&"fold function".to_string(), 2)?;
 
         let mut result = list[0].clone();
 
