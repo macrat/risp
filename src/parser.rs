@@ -175,7 +175,9 @@ impl Parser {
         match c {
             '(' if !self.builder.is_string() => {
                 self.flush()?;
-                self.stack.push(RList::empty(Some(self.position.clone())));
+                let mut list = RList::empty(Some(self.position.clone()));
+                list.set_as_calling();
+                self.stack.push(list);
             }
             ')' if !self.builder.is_string() => {
                 self.flush()?;

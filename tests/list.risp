@@ -15,5 +15,5 @@
 
   (assert =
           "ab"
-          (map (list (list "a" 1) (list "b" 2))
-               (func (acc cur) (+ acc (car cur))))))
+          (fold (list "" (list "a" 1) (list "b" 2))
+                (func (acc cur) (+ acc (car cur))))))

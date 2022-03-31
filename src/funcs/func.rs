@@ -39,7 +39,7 @@ impl Callable for Func {
                     ))
                 }
             },
-            body: RList::from(&args[1..], None),
+            body: RList::new(args[1..].into(), None),
             capture: scope.clone(),
         })))
     }

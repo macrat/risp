@@ -15,7 +15,7 @@ impl Callable for List {
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        Ok(RValue::List(args.compute_each(env, scope)?))
+        args.compute(env, scope)
     }
 }
 
@@ -60,7 +60,7 @@ impl Callable for Cdr {
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         match args[0].compute(env, scope)? {
-            RValue::List(list) => Ok(RValue::List(RList::from(&list[1..], None))),
+            RValue::List(list) => Ok(RValue::List(RList::new(list[1..].into(), None))),
             RValue::Atom(RAtom::String(x)) => {
                 let mut chars = x.chars();
                 chars.next();

@@ -74,13 +74,14 @@ impl From<&Trace> for RValue {
                 Some(pos) => (pos.file, pos.line, pos.col),
                 None => ("<dynamic>".to_string(), 0, 0),
             };
-            list.push(RValue::List(RList::from(
-                &[
+            list.push(RValue::List(RList::new(
+                [
                     file.into(),
                     f64::from(line).into(),
                     f64::from(col_).into(),
                     x.to_string().into(),
-                ],
+                ]
+                .into(),
                 None,
             )));
         }

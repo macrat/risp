@@ -48,7 +48,7 @@ impl Callable for While {
                 break;
             }
 
-            result = RList::from(&args[1..], None).compute_last(env, &local)?;
+            result = RList::new(args[1..].into(), None).compute_last(env, &local)?;
         }
 
         Ok(result)
@@ -118,25 +118,13 @@ impl Callable for TryCatch {
 
         let saved_trace = env.trace.save();
 
-        match RList::from(&args[1..], None).compute_last(env, scope) {
+        match RList::new(args[1..].into(), None).compute_last(env, scope) {
             Ok(val) => Ok(val),
             Err(err) => {
-                // XXX: This variables are not necessary, if interpreter can decide if a RList means calling function or just a list.
-                //      But in current implementation, this is necessary sadly.
-                let scope = scope.child();
-                scope.define("__error__".into(), err.into())?;
-                scope.define("__trace__".into(), (&env.trace).into())?;
-
                 let result = func.call(
                     env,
                     &scope,
-                    RList::from(
-                        &[
-                            RValue::Atom(RAtom::Symbol("__error__".into())),
-                            RValue::Atom(RAtom::Symbol("__trace__".into())),
-                        ],
-                        None,
-                    ),
+                    RList::new([err.into(), (&env.trace).into()].into(), None),
                 )?;
 
                 env.trace.restore(saved_trace);

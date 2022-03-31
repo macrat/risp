@@ -87,7 +87,7 @@ impl From<RError> for RValue {
     fn from(err: RError) -> RValue {
         match err {
             RError::System(category, detail) => {
-                RValue::List(RList::from(&[category.into(), detail.into()], None))
+                RValue::List(RList::new([category.into(), detail.into()].into(), None))
             }
             RError::User(obj) => obj.clone(),
         }
@@ -154,44 +154,50 @@ impl From<f64> for RAtom {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum ListType {
+    Immediate,
+    Calling,
+}
+
 #[derive(Debug)]
-pub struct RList(Vec<RValue>, Option<Position>);
+pub struct RList(ListType, Vec<RValue>, Option<Position>);
 
 impl RList {
     pub fn new(items: Vec<RValue>, pos: Option<Position>) -> RList {
-        RList(items, pos)
-    }
-
-    pub fn from(items: &[RValue], pos: Option<Position>) -> RList {
-        RList::new(items.to_vec(), pos)
+        RList(ListType::Immediate, items, pos)
     }
 
     pub fn empty(pos: Option<Position>) -> RList {
         RList::new(Vec::new(), pos)
     }
 
+    pub fn set_as_calling(&mut self) {
+        self.0 = ListType::Calling;
+    }
+
     pub fn push(&mut self, val: RValue) {
-        self.0.push(val)
+        self.1.push(val)
     }
 
     pub fn compute(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
-        if self.0.len() == 0 {
-            return Ok(RValue::nil());
+        match self.0 {
+            ListType::Calling if self.len() != 0 => self.compute_call(env, scope),
+            _ => Ok(RValue::List(self.compute_each(env, scope)?)),
         }
+    }
 
+    fn compute_call(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
         env.trace.push(self.clone());
-        match self.0[0].compute(env, scope) {
+
+        match self.1[0].compute(env, scope) {
             Ok(first) => match &first {
                 RValue::Func(func) => {
-                    let args = RList::from(&self.0[1..], None);
-                    func.arg_rule().check(&self.0[0].to_string(), &args)?;
-                    match func.call(env, scope, args) {
-                        Ok(x) => {
-                            env.trace.pop();
-                            Ok(x)
-                        }
-                        Err(err) => Err(err),
-                    }
+                    let args = RList::new(self.1[1..].into(), None);
+                    func.arg_rule().check(&self.1[0].to_string(), &args)?;
+                    let result = func.call(env, scope, args)?;
+                    env.trace.pop();
+                    Ok(result)
                 }
                 _ => Err(RError::type_(format!("`{}` is not a function.", first))),
             },
@@ -201,7 +207,7 @@ impl RList {
 
     pub fn compute_last(&self, env: &mut Env, scope: &Scope) -> Result<RValue, RError> {
         let mut result = RValue::nil();
-        for x in &self.0 {
+        for x in &self.1 {
             match x.compute(env, scope) {
                 Ok(x) => {
                     result = x;
@@ -214,7 +220,7 @@ impl RList {
 
     pub fn compute_each(&self, env: &mut Env, scope: &Scope) -> Result<RList, RError> {
         let mut result = RList::empty(None);
-        for x in &self.0 {
+        for x in &self.1 {
             match x.compute(env, scope) {
                 Ok(x) => result.push(x),
                 Err(err) => return Err(err),
@@ -225,7 +231,7 @@ impl RList {
 
     pub fn to_bare_string(&self) -> String {
         let mut vec: Vec<String> = Vec::new();
-        for x in &self.0 {
+        for x in &self.1 {
             vec.push(x.to_string());
         }
         vec.join(" ")
@@ -233,7 +239,7 @@ impl RList {
 
     pub fn to_bare_printable(&self) -> String {
         let mut vec: Vec<String> = Vec::new();
-        for x in &self.0 {
+        for x in &self.1 {
             vec.push(x.to_printable());
         }
         vec.join(" ")
@@ -244,11 +250,11 @@ impl RList {
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.1.len()
     }
 
     pub fn iter(&self) -> std::slice::Iter<RValue> {
-        self.0.iter()
+        self.1.iter()
     }
 
     pub fn cmp(&self, other: &RList) -> Result<Ordering, RError> {
@@ -267,7 +273,7 @@ impl RList {
     }
 
     pub fn position(&self) -> Option<Position> {
-        match &self.1 {
+        match &self.2 {
             Some(x) => Some(x.clone()),
             None => None,
         }
@@ -282,8 +288,9 @@ impl fmt::Display for RList {
 
 impl Clone for RList {
     fn clone(&self) -> RList {
-        let mut result = RList::empty(self.1.clone());
-        for x in &self.0 {
+        let mut result = RList::empty(self.2.clone());
+        result.0 = self.0;
+        for x in &self.1 {
             result.push((*x).clone());
         }
         result
@@ -310,7 +317,7 @@ impl Index<usize> for RList {
     type Output = RValue;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        &self.1[index]
     }
 }
 
@@ -318,7 +325,7 @@ impl Index<RangeFrom<usize>> for RList {
     type Output = [RValue];
 
     fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
-        &self.0[index]
+        &self.1[index]
     }
 }
 
@@ -417,7 +424,7 @@ impl Callable for RFunc {
                 capture,
             } => {
                 let local = capture.child();
-                for (name, value) in arg_names.iter().zip(args.0) {
+                for (name, value) in arg_names.iter().zip(args.iter()) {
                     local.define(name.into(), value.compute(env, scope)?)?;
                 }
 
@@ -465,7 +472,7 @@ impl RValue {
 
     pub fn is_nil(&self) -> bool {
         match self {
-            RValue::List(list) if list.0.len() == 0 => true,
+            RValue::List(list) => list.len() == 0,
             _ => false,
         }
     }
