@@ -105,7 +105,7 @@ $ cargo run
 - `(println values...)`: print `values` to stdout with `\n`. this is the same as `(stdout (+ (string values...) "\n"))`.
 
 ### operator
-- `(+ numbers-or-strings...)`: add numbers, or join strings.
+- `(+ numbers...)` or `(+ strings...)` or `(+ lists...)`: add numbers, or join strings, or join lists.
 - `(- numbers...)`: subtract numbers from the first number. `(- x)` means the same as `(- 0 x)`.
 - `(* numbers...)`: multiply numbers.
 - `(/ numbers...)`: divide numbers.

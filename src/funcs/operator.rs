@@ -34,7 +34,7 @@ pub const ADD: CalculateOperator = CalculateOperator("+", 1, |xs| match &xs[0] {
             } else {
                 return Err(RError::type_(format!(
                     "`+` can not apply to different types such as string and {}.",
-                    x.type_str()
+                    x.type_str(),
                 )));
             }
         }
@@ -48,11 +48,26 @@ pub const ADD: CalculateOperator = CalculateOperator("+", 1, |xs| match &xs[0] {
             } else {
                 return Err(RError::type_(format!(
                     "`+` can not apply to different types such as number and {}.",
-                    x.type_str()
+                    x.type_str(),
                 )));
             }
         }
         Ok(result.into())
+    }
+    RValue::List(list) => {
+        let mut list = list.clone();
+        for xs in &xs[1..] {
+            match xs {
+                RValue::List(xs) => list.extend(xs.clone()),
+                _ => {
+                    return Err(RError::type_(format!(
+                        "`+` can not apply to different types such as list and {}.",
+                        xs.type_str(),
+                    )))
+                }
+            }
+        }
+        Ok(RValue::List(list))
     }
     x => Err(RError::type_(format!(
         "`+` can not apply to {}.",
@@ -66,7 +81,7 @@ pub const SUB: CalculateOperator = CalculateOperator("-", 1, |xs| {
             RValue::Atom(RAtom::Number(x)) => Ok((-x).into()),
             x => Err(RError::type_(format!(
                 "`-` can not apply to {}.",
-                x.type_str()
+                x.type_str(),
             ))),
         }
     } else {
@@ -75,7 +90,7 @@ pub const SUB: CalculateOperator = CalculateOperator("-", 1, |xs| {
         } else {
             return Err(RError::type_(format!(
                 "`-` can not apply to {}.",
-                xs[0].type_str()
+                xs[0].type_str(),
             )));
         };
 
@@ -85,7 +100,7 @@ pub const SUB: CalculateOperator = CalculateOperator("-", 1, |xs| {
             } else {
                 return Err(RError::type_(format!(
                     "`-` can not apply to {}.",
-                    x.type_str()
+                    x.type_str(),
                 )));
             }
         }
@@ -115,7 +130,7 @@ pub const DIVIDE: CalculateOperator = CalculateOperator("/", 2, |xs| {
     } else {
         return Err(RError::type_(format!(
             "`/` can not apply to {}.",
-            xs[0].type_str()
+            xs[0].type_str(),
         )));
     };
 
@@ -125,7 +140,7 @@ pub const DIVIDE: CalculateOperator = CalculateOperator("/", 2, |xs| {
         } else {
             return Err(RError::type_(format!(
                 "`/` can not apply to {}.",
-                x.type_str()
+                x.type_str(),
             )));
         }
     }

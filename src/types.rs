@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::convert::From;
 use std::fmt;
+use std::iter::Extend;
 use std::ops::{Index, RangeFrom};
 use std::rc::Rc;
 
@@ -255,6 +256,10 @@ impl RList {
 
     pub fn iter(&self) -> std::slice::Iter<RValue> {
         self.1.iter()
+    }
+
+    pub fn extend(&mut self, list: RList) {
+        self.1.extend(list.1)
     }
 
     pub fn cmp(&self, other: &RList) -> Result<Ordering, RError> {
