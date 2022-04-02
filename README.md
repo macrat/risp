@@ -81,6 +81,7 @@ $ cargo run
 ### function
 - `(func (args...) body...)`: make a new function that takes certain length of arguments.
 - `(func arg body...)`: make a new function that takes variable length of arguments.
+- `(apply func list)`: call `func` with `list` as arguments.
 
 ### list
 - `(list values...)`: make list that have `values`. this is the same as `'(values...)` in major Lisp implementations.

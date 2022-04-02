@@ -63,3 +63,11 @@
        (f ())
        (f (list 1) 1)
        (f (list "hello" 123) "hello" 123)))
+
+((test case)
+ "apply"
+ (func ()
+       (assert = 5 (apply + (list 2 3)))
+       (assert = 6 (apply + (list 1 2 3)))
+       (assert = (list 2 3) (apply list (list 2 3)))
+       (assert = () (apply list ()))))

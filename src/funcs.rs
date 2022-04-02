@@ -37,6 +37,7 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
 
     // function
     register!(scope, "func", binary_func!(func::Func));
+    register!(scope, "apply", binary_func!(func::Apply));
 
     // list
     register!(scope, "list", binary_func!(list::List));

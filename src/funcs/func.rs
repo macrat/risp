@@ -52,3 +52,40 @@ impl fmt::Display for Func {
         write!(f, "func")
     }
 }
+
+#[derive(Debug)]
+pub struct Apply;
+
+impl Callable for Apply {
+    fn name(&self) -> &str {
+        "apply"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let func = match args[0].compute(env, scope)? {
+            RValue::Func(func) => func,
+            x => {
+                return Err(RError::type_(format!(
+                    "the first argument of `apply` should be a func but got {}.",
+                    x.type_str(),
+                )))
+            }
+        };
+
+        let args = match args[1].compute(env, scope)? {
+            RValue::List(list) => list,
+            x => {
+                return Err(RError::type_(format!(
+                    "the second argument of `apply` should be a list but got {}.",
+                    x.type_str(),
+                )))
+            }
+        };
+
+        func.call(env, scope, args)
+    }
+}
