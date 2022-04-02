@@ -88,6 +88,8 @@
 
        (assert = (list 0 1 0) (map not (seq -1 1)))
 
+       (assert = (list "a") (map + (list "a")))
+
        (assert =
                (list "a" "b")
                (map car (list (list "a" 1) (list "b" 2))))))
@@ -99,6 +101,9 @@
        (assert = 120 (fold * (seq 5)))
 
        (assert = "hello" (fold + (list "he" "l" "lo")))
+
+       (assert = "a" (fold + (list "a")))
+       (assert = () (fold + ()))
 
        (assert =
                "ab"

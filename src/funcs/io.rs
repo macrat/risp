@@ -63,30 +63,3 @@ impl<T: io::Write> Callable for Stream<'_, T> {
         }
     }
 }
-
-#[derive(Debug)]
-pub struct PrintFunc<'a>(&'a str, &'a str);
-
-impl Callable for PrintFunc<'_> {
-    fn name(&self) -> &str {
-        self.0
-    }
-
-    fn arg_rule(&self) -> ArgumentRule {
-        ArgumentRule::Any
-    }
-
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        let s = args.compute_each(env, scope)?.to_bare_printable() + self.1;
-
-        let call = RList::new(
-            [RValue::Atom(RAtom::Symbol("stdout".into())), s.into()].into(),
-            None,
-        );
-
-        call.compute_call(env, scope)
-    }
-}
-
-pub const PRINT: PrintFunc = PrintFunc("print", "");
-pub const PRINTLN: PrintFunc = PrintFunc("println", "\n");

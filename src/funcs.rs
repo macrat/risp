@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::env::Env;
+use crate::parser::parse;
 use crate::scope::Scope;
 use crate::types::*;
 
@@ -23,6 +25,12 @@ macro_rules! register {
     };
 }
 
+fn execute(scope: &Scope, code: &str) -> Result<(), RError> {
+    let mut env = Env::new();
+    parse(code)?.compute_last(&mut env, scope)?;
+    Ok(())
+}
+
 pub fn register_to(scope: &Scope) -> Result<(), RError> {
     // variable
     register!(scope, "def", binary_func!(variable::Def));
@@ -43,7 +51,7 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "list", binary_func!(list::List));
     register!(scope, "length", binary_func!(list::Length));
     register!(scope, "get", binary_func!(list::Get));
-    register!(scope, "car", binary_func!(list::Car));
+    execute(scope, "(def car (func (xs) (get 0 xs)))")?;
     register!(scope, "cdr", binary_func!(list::Cdr));
     register!(scope, "seq", binary_func!(list::Seq));
     register!(scope, "map", binary_func!(list::Map));
@@ -53,8 +61,14 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "import", binary_func!(io::Import));
     register!(scope, "stdout", binary_func!(io::stdout()));
     register!(scope, "stderr", binary_func!(io::stderr()));
-    register!(scope, "print", binary_func!(io::PRINT));
-    register!(scope, "println", binary_func!(io::PRINTLN));
+    execute(
+        scope,
+        r#"(def print (func xs (if (!= xs ()) (stdout (fold (func (acc cur) (+ (string acc) " " (string cur))) xs)))))"#,
+    )?;
+    execute(
+        scope,
+        r#"(def println (func xs (apply print xs) (stdout "\n")))"#,
+    )?;
 
     // type
     register!(scope, "number", binary_func!(types::ToNumber));

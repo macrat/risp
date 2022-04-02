@@ -102,33 +102,6 @@ impl Callable for Get {
 }
 
 #[derive(Debug)]
-pub struct Car;
-
-impl Callable for Car {
-    fn name(&self) -> &str {
-        "car"
-    }
-
-    fn arg_rule(&self) -> ArgumentRule {
-        ArgumentRule::Exact(1)
-    }
-
-    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        match args[0].compute(env, scope)? {
-            RValue::List(list) => Ok(list[0].clone()),
-            RValue::Atom(RAtom::String(x)) => match x.chars().next() {
-                Some(c) => Ok(c.to_string().into()),
-                None => Ok("".into()),
-            },
-            x => Err(RError::type_(format!(
-                "`car` needs list or string but got {}",
-                x,
-            ))),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct Cdr;
 
 impl Callable for Cdr {
@@ -285,17 +258,17 @@ impl Callable for Fold {
 
         let list = match args[1].compute(env, scope)? {
             RValue::List(xs) if xs.len() >= 2 => xs,
+            RValue::List(xs) if xs.len() == 1 => {
+                return Ok(xs[0].clone());
+            }
             RValue::List(xs) => {
-                return Err(RError::type_(format!(
-                    "the second argument of `fold` must be longer than 2, but got `{}`.",
-                    xs
-                )))
+                return Ok(RValue::List(xs.clone()));
             }
             x => {
                 return Err(RError::type_(format!(
                     "the second argument of `fold` must be a list, but got `{}`.",
                     x
-                )))
+                )));
             }
         };
 

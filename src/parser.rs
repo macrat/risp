@@ -268,19 +268,19 @@ impl Parser {
     }
 }
 
+pub fn parse(text: &str) -> Result<RList, RError> {
+    let mut p = Parser::new("<internal>".into());
+
+    p.feed(text)?;
+
+    p.close()?;
+
+    Ok(RList::new(p.queue.into(), None))
+}
+
 #[cfg(test)]
 pub mod test {
     use super::*;
-
-    pub fn parse(text: &str) -> Result<RList, RError> {
-        let mut p = Parser::new("<test>".into());
-
-        p.feed(text)?;
-
-        p.close()?;
-
-        Ok(RList::new(p.queue.into(), None))
-    }
 
     fn assert_atom(expect: RAtom, code: &str) {
         match parse(code) {
