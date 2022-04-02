@@ -20,6 +20,88 @@ impl Callable for List {
 }
 
 #[derive(Debug)]
+pub struct Length;
+
+impl Callable for Length {
+    fn name(&self) -> &str {
+        "length"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(1)
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let len = match args[0].compute(env, scope)? {
+            RValue::Atom(RAtom::String(s)) => s.chars().count(),
+            RValue::List(list) => list.len(),
+            x => {
+                return Err(RError::type_(format!(
+                    "the argument of `length` must be a list or a string, but got {}.",
+                    x.type_str(),
+                )))
+            }
+        };
+
+        Ok((len as f64).into())
+    }
+}
+
+#[derive(Debug)]
+pub struct Get;
+
+impl Callable for Get {
+    fn name(&self) -> &str {
+        "get"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let idx = match args[0].compute(env, scope)? {
+            RValue::Atom(RAtom::Number(n)) => n,
+            x => {
+                return Err(RError::type_(format!(
+                    "the first argument of `get` must be a number, but got {}.",
+                    x.type_str(),
+                )))
+            }
+        };
+
+        match args[1].compute(env, scope)? {
+            RValue::Atom(RAtom::String(s)) => {
+                if let Some(c) = s.chars().nth(idx as usize) {
+                    Ok(c.to_string().into())
+                } else {
+                    Err(RError::argument(format!(
+                        "string length is {} but got index {}.",
+                        s.chars().count(),
+                        idx,
+                    )))
+                }
+            }
+            RValue::List(list) => {
+                if idx < 0.0 || list.len() <= idx as usize {
+                    return Err(RError::argument(format!(
+                        "list length is {} but got index {}.",
+                        list.len(),
+                        idx,
+                    )));
+                }
+
+                Ok(list[idx as usize].clone())
+            }
+            x => Err(RError::type_(format!(
+                "the second argument of `get` must be a list, but got {}.",
+                x.type_str(),
+            ))),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Car;
 
 impl Callable for Car {

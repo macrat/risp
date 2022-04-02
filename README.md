@@ -83,6 +83,8 @@ $ cargo run
 
 ### list
 - `(list values...)`: make list that have `values`. this is the same as `'(values...)` in major Lisp implementations.
+- `(length list-or-string)`: get the length of `list-or-string`.
+- `(get number list-or-string)`: get an element at the position in the `list-or-string`.
 - `(car list-or-string)`: take first item of the list, or take first character of the string.
 - `(cdr list-or-string)`: take second and later items of the list, or take second and later characters of the string.
 - `(seq to)` or `(seq from to)`: make list of numbers. for example, `(seq 5)` makes `(list 1 2 3 4 5)`.

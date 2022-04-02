@@ -18,7 +18,6 @@
                      (func () (import name))))
   (list 
     "./calc.risp"
-    "./car-cdr.risp"
     "./compare.risp"
     "./func.risp"
     "./if.risp"

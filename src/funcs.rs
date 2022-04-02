@@ -40,6 +40,8 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
 
     // list
     register!(scope, "list", binary_func!(list::List));
+    register!(scope, "length", binary_func!(list::Length));
+    register!(scope, "get", binary_func!(list::Get));
     register!(scope, "car", binary_func!(list::Car));
     register!(scope, "cdr", binary_func!(list::Cdr));
     register!(scope, "seq", binary_func!(list::Seq));

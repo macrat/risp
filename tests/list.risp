@@ -4,6 +4,82 @@
 (def assert (test assert))
 
 ((test case)
+ "length"
+ (func ()
+       ((test case)
+        "list"
+        (func ()
+              (assert = 3 (length (list 1 2 3)))
+              (assert = 5 (length (list 1 2 3 4 5)))
+              (assert = 0 (length ()))))
+
+        ((test case)
+         "string"
+         (func ()
+               (assert = 11 (length "hello world"))
+               (assert = 5 (length "あいうえお"))
+               (assert = 0 (length ""))))
+
+       (try-catch
+         (func (err trace)
+               (assert = err (list "incompatible type" "the argument of `length` must be a list or a string, but got number.")))
+         (length 1))))
+
+((test case)
+ "get"
+ (func ()
+       ((test case)
+        "list"
+         (func ()
+               (assert = 15 (get 0 (seq 15 20)))
+               (assert = 16 (get 1 (seq 15 20)))
+               (assert = 18 (get 3 (seq 15 20)))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "unmatched arguments" "list length is 5 but got index 10.")))
+                 (get 10 (seq 5)))))
+
+       ((test case)
+        "string"
+         (func ()
+               (assert = "a" (get 0 "abcde"))
+               (assert = "b" (get 1 "abcde"))
+               (assert = "d" (get 3 "abcde"))
+
+               (assert = "お" (get 4 "あいうえお"))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "unmatched arguments" "string length is 5 but got index 10.")))
+                 (get 10 "abcde"))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "unmatched arguments" "string length is 5 but got index 10.")))
+                 (get 10 "あいうえお"))))))
+
+((test case)
+ "car cdr"
+
+ (func ()
+       ((test case)
+        "list"
+        (func ()
+              (def xs (list 12 34 56))
+              (assert = 12 (car xs))
+              (assert = (list 34 56) (cdr xs))
+              (assert = 34 (car (cdr xs)))))
+
+       ((test case)
+        "string"
+        (func ()
+              (def xs "hello")
+              (assert = "h" (car xs))
+              (assert = "e" (car (cdr xs)))
+              (assert = "llo" (cdr (cdr xs)))))))
+
+((test case)
  "map"
  (func ()
        (def f (func (x) (* x 2)))
