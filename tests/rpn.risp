@@ -1,0 +1,66 @@
+" Reverse Polish Notation "
+" vim: set ft=lisp : "
+
+(def test (import "./test.risp"))
+(def assert (test assert))
+
+(def verbose 0)
+
+(def cons
+     (func (x xs)
+           (+ (list x) xs)))
+
+(def operators
+     (list
+       (list "+" +)
+       (list "-" -)
+       (list "*" *)
+       (list "/" /)))
+
+(def find-operator
+     (func (c)
+           (def ops operators)
+           (while (and ops (!= c (get 0 (get 0 ops))))
+                  (set ops (tail -1 ops)))
+           (if ops
+             (get 1 (get 0 ops))
+             (throw (+ "unknown operator: " c)))))
+
+(def calc-rpn
+     (func (input)
+           (def stack ())
+           (def buf "")
+
+           (def flush
+                (func ()
+                      (if buf
+                        (do
+                          (set stack (cons (number buf) stack))
+                          (set buf "")))))
+
+           (while input
+                  (if verbose
+                    (println (literal input) "=>" (literal buf) (literal stack)))
+
+                  (def c (get 0 input))
+                  (set input (tail -1 input))
+
+                  (if (= c " ")
+                    (do
+                      (flush))
+                    (if (apply or (map (func (x) (= c x)) "0123456789"))
+                      (do
+                        (set buf (+ buf c)))
+                      (do
+                        (flush)
+                        (def val
+                             ((find-operator c)
+                              (get 1 stack)
+                              (get 0 stack)))
+                        (set stack (cons val (tail -2 stack)))))))
+
+           (if verbose
+             (println "\"\" => \"\"" (literal stack)))
+           (get 0 stack)))
+
+(assert = 15 (calc-rpn "3 2 + 3 *"))
