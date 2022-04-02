@@ -51,8 +51,10 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "list", binary_func!(list::List));
     register!(scope, "length", binary_func!(list::Length));
     register!(scope, "get", binary_func!(list::Get));
+    register!(scope, "head", binary_func!(list::Head));
+    register!(scope, "tail", binary_func!(list::Tail));
     execute(scope, "(def car (func (xs) (get 0 xs)))")?;
-    register!(scope, "cdr", binary_func!(list::Cdr));
+    execute(scope, "(def cdr (func (xs) (tail -1 xs)))")?;
     register!(scope, "seq", binary_func!(list::Seq));
     register!(scope, "map", binary_func!(list::Map));
     register!(scope, "fold", binary_func!(list::Fold));

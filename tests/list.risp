@@ -66,6 +66,80 @@
                  (get 10 "あいうえお"))))))
 
 ((test case)
+ "head"
+ (func ()
+       ((test case)
+        "list"
+         (func ()
+               (assert = () (head 0 (seq 5 10)))
+
+               (assert = (list 5) (head 1 (seq 5 10)))
+               (assert = (list 5 6 7) (head 3 (seq 5 10)))
+
+               (assert = (list 5 6 7 8 9) (head -1 (seq 5 10)))
+               (assert = (list 5 6 7 8) (head -2 (seq 5 10)))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
+                 (head 10 (seq 5)))))
+
+       ((test case)
+        "string"
+         (func ()
+               (assert = "" (head 0 "abcde"))
+
+               (assert = "a" (head 1 "abcde"))
+               (assert = "abc" (head 3 "abcde"))
+
+               (assert = "abcd" (head -1 "abcde"))
+               (assert = "abc" (head -2 "abcde"))
+
+               (assert = "あいう" (head 3 "あいうえお"))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
+                 (head 10 "あいうえお"))))))
+
+((test case)
+ "tail"
+ (func ()
+       ((test case)
+        "list"
+         (func ()
+               (assert = () (tail 0 (seq 5 10)))
+
+               (assert = (list 10) (tail 1 (seq 5 10)))
+               (assert = (list 8 9 10) (tail 3 (seq 5 10)))
+
+               (assert = (list 6 7 8 9 10) (tail -1 (seq 5 10)))
+               (assert = (list 7 8 9 10) (tail -2 (seq 5 10)))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
+                 (tail 10 (seq 5)))))
+
+       ((test case)
+        "string"
+         (func ()
+               (assert = "" (tail 0 "abcde"))
+
+               (assert = "e" (tail 1 "abcde"))
+               (assert = "cde" (tail 3 "abcde"))
+
+               (assert = "bcde" (tail -1 "abcde"))
+               (assert = "cde" (tail -2 "abcde"))
+
+               (assert = "うえお" (tail 3 "あいうえお"))
+
+               (try-catch
+                 (func (err trace)
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
+                 (tail 10 "あいうえお"))))))
+
+((test case)
  "car cdr"
 
  (func ()

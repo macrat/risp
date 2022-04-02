@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::convert::From;
 use std::fmt;
 use std::iter::Extend;
-use std::ops::{Index, RangeFrom};
+use std::ops::{Index, RangeFrom, RangeTo};
 use std::rc::Rc;
 
 use crate::env::{trace::Position, Env};
@@ -337,6 +337,14 @@ impl Index<RangeFrom<usize>> for RList {
     type Output = [RValue];
 
     fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
+        &self.1[index]
+    }
+}
+
+impl Index<RangeTo<usize>> for RList {
+    type Output = [RValue];
+
+    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
         &self.1[index]
     }
 }

@@ -110,7 +110,7 @@ impl Callable for Get {
             }
             RValue::List(list) => Ok(list[calc_index(idx, list.len())?].clone()),
             x => Err(RError::type_(format!(
-                "the second argument of `get` must be a list, but got {}.",
+                "the second argument of `head` must be a list or a string, but got {}.",
                 x.type_str(),
             ))),
         }
@@ -118,28 +118,84 @@ impl Callable for Get {
 }
 
 #[derive(Debug)]
-pub struct Cdr;
+pub struct Head;
 
-impl Callable for Cdr {
+impl Callable for Head {
     fn name(&self) -> &str {
-        "cdr"
+        "head"
     }
 
     fn arg_rule(&self) -> ArgumentRule {
-        ArgumentRule::Exact(1)
+        ArgumentRule::Exact(2)
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        match args[0].compute(env, scope)? {
-            RValue::List(list) => Ok(RValue::List(RList::new(list[1..].into(), None))),
-            RValue::Atom(RAtom::String(x)) => {
-                let mut chars = x.chars();
-                chars.next();
-                Ok(chars.as_str().into())
+        let idx = match args[0].compute(env, scope)? {
+            RValue::Atom(RAtom::Number(n)) => n,
+            x => {
+                return Err(RError::type_(format!(
+                    "the first argument of `head` must be a number, but got {}.",
+                    x.type_str(),
+                )))
             }
+        };
+
+        match args[1].compute(env, scope)? {
+            RValue::Atom(RAtom::String(s)) => {
+                Ok(String::from_iter(s.chars().take(calc_index(idx, s.chars().count())?)).into())
+            }
+            RValue::List(list) => Ok(RValue::List(RList::new(
+                list[..calc_index(idx, list.len())?].into(),
+                None,
+            ))),
             x => Err(RError::type_(format!(
-                "`cdr` needs list or string but got {}",
-                x,
+                "the second argument of `head` must be a list or a string, but got {}.",
+                x.type_str(),
+            ))),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Tail;
+
+impl Callable for Tail {
+    fn name(&self) -> &str {
+        "tail"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::Exact(2)
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        let idx = match args[0].compute(env, scope)? {
+            RValue::Atom(RAtom::Number(n)) => n,
+            x => {
+                return Err(RError::type_(format!(
+                    "the first argument of `tail` must be a number, but got {}.",
+                    x.type_str(),
+                )))
+            }
+        };
+
+        match args[1].compute(env, scope)? {
+            RValue::Atom(RAtom::String(s)) => {
+                if idx == 0.0 {
+                    Ok("".into())
+                } else {
+                    let len = s.chars().count();
+                    let idx = calc_index(idx, len)?;
+                    Ok(String::from_iter(s.chars().skip(len - idx)).into())
+                }
+            }
+            RValue::List(list) => Ok(RValue::List(RList::new(
+                list[(list.len() - calc_index(idx, list.len())?)..].into(),
+                None,
+            ))),
+            x => Err(RError::type_(format!(
+                "the second argument of `tail` must be a list or a string, but got {}.",
+                x.type_str(),
             ))),
         }
     }
