@@ -47,6 +47,36 @@ impl Callable for Length {
     }
 }
 
+fn calc_index(idx: f64, len: usize) -> Result<usize, RError> {
+    if 0.0 <= idx {
+        if len <= idx as usize {
+            Err(RError::out_of_bounds(idx, len))
+        } else {
+            Ok(idx as usize)
+        }
+    } else {
+        let rev = (len as f64) + idx;
+        if rev < 0.0 || len < rev as usize {
+            Err(RError::out_of_bounds(idx, len))
+        } else {
+            Ok(rev as usize)
+        }
+    }
+}
+
+#[test]
+fn test_calc_index() {
+    assert_eq!(calc_index(0.0, 10), Ok(0));
+
+    assert_eq!(calc_index(3.0, 10), Ok(3));
+    assert_eq!(calc_index(9.0, 10), Ok(9));
+    assert_eq!(calc_index(10.0, 10), Err(RError::out_of_bounds(10.0, 10)));
+
+    assert_eq!(calc_index(-2.0, 10), Ok(8));
+    assert_eq!(calc_index(-10.0, 10), Ok(0));
+    assert_eq!(calc_index(-11.0, 10), Err(RError::out_of_bounds(-11.0, 10)));
+}
+
 #[derive(Debug)]
 pub struct Get;
 
@@ -72,27 +102,13 @@ impl Callable for Get {
 
         match args[1].compute(env, scope)? {
             RValue::Atom(RAtom::String(s)) => {
-                if let Some(c) = s.chars().nth(idx as usize) {
+                if let Some(c) = s.chars().nth(calc_index(idx, s.chars().count())?) {
                     Ok(c.to_string().into())
                 } else {
-                    Err(RError::argument(format!(
-                        "string length is {} but got index {}.",
-                        s.chars().count(),
-                        idx,
-                    )))
+                    Err(RError::out_of_bounds(idx, s.chars().count()))
                 }
             }
-            RValue::List(list) => {
-                if idx < 0.0 || list.len() <= idx as usize {
-                    return Err(RError::argument(format!(
-                        "list length is {} but got index {}.",
-                        list.len(),
-                        idx,
-                    )));
-                }
-
-                Ok(list[idx as usize].clone())
-            }
+            RValue::List(list) => Ok(list[calc_index(idx, list.len())?].clone()),
             x => Err(RError::type_(format!(
                 "the second argument of `get` must be a list, but got {}.",
                 x.type_str(),

@@ -39,6 +39,13 @@ impl RError {
         RError::System("unmatched arguments".to_string(), reason)
     }
 
+    pub fn out_of_bounds<T: fmt::Display>(got: T, real: usize) -> RError {
+        RError::System(
+            "out of bounds".to_string(),
+            format!("{} is out of bounds for length {}.", got, real),
+        )
+    }
+
     pub fn incompleted(buf: String) -> RError {
         RError::System(
             "incompleted expression".to_string(),

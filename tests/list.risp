@@ -35,9 +35,12 @@
                (assert = 16 (get 1 (seq 15 20)))
                (assert = 18 (get 3 (seq 15 20)))
 
+               (assert = 20 (get -1 (seq 15 20)))
+               (assert = 19 (get -2 (seq 15 20)))
+
                (try-catch
                  (func (err trace)
-                       (assert = err (list "unmatched arguments" "list length is 5 but got index 10.")))
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
                  (get 10 (seq 5)))))
 
        ((test case)
@@ -47,16 +50,19 @@
                (assert = "b" (get 1 "abcde"))
                (assert = "d" (get 3 "abcde"))
 
+               (assert = "e" (get -1 "abcde"))
+               (assert = "d" (get -2 "abcde"))
+
                (assert = "お" (get 4 "あいうえお"))
 
                (try-catch
                  (func (err trace)
-                       (assert = err (list "unmatched arguments" "string length is 5 but got index 10.")))
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
                  (get 10 "abcde"))
 
                (try-catch
                  (func (err trace)
-                       (assert = err (list "unmatched arguments" "string length is 5 but got index 10.")))
+                       (assert = err (list "out of bounds" "10 is out of bounds for length 5.")))
                  (get 10 "あいうえお"))))))
 
 ((test case)
