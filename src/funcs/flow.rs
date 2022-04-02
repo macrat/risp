@@ -40,7 +40,6 @@ impl Callable for While {
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        let local = scope.child();
         let mut result = RValue::nil();
 
         loop {
@@ -48,6 +47,7 @@ impl Callable for While {
                 break;
             }
 
+            let local = scope.child();
             result = RList::new(args[1..].into(), None).compute_last(env, &local)?;
         }
 
