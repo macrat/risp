@@ -469,6 +469,17 @@ impl RValue {
         }
     }
 
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            RValue::List(x) if x.len() == 0 => "nil",
+            RValue::List(_) => "list",
+            RValue::Atom(RAtom::Symbol(_)) => "symbol",
+            RValue::Atom(RAtom::Number(_)) => "number",
+            RValue::Atom(RAtom::String(_)) => "string",
+            RValue::Func(_) => "func",
+        }
+    }
+
     pub fn cmp(&self, other: &RValue) -> Result<Ordering, RError> {
         match (self, other) {
             (RValue::Atom(RAtom::Number(x)), RValue::Atom(RAtom::Number(y))) => {

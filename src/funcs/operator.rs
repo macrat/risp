@@ -25,49 +25,68 @@ impl Callable for CalculateOperator<'_> {
     }
 }
 
-pub const ADD: CalculateOperator = CalculateOperator("+", 1, |xs| {
-    if let RValue::Atom(RAtom::String(_)) = xs[0] {
+pub const ADD: CalculateOperator = CalculateOperator("+", 1, |xs| match &xs[0] {
+    RValue::Atom(RAtom::String(_)) => {
         let mut result = String::new();
         for x in xs {
             if let RValue::Atom(RAtom::String(x)) = x {
                 result += &x;
             } else {
-                return Err(RError::type_(format!("`+` can not apply to {}", x)));
+                return Err(RError::type_(format!(
+                    "`+` can not apply to different types such as string and {}.",
+                    x.type_str()
+                )));
             }
         }
         Ok(result.into())
-    } else {
+    }
+    RValue::Atom(RAtom::Number(_)) => {
         let mut result = 0.0;
         for x in xs {
             if let RValue::Atom(RAtom::Number(x)) = x {
                 result += x;
             } else {
-                return Err(RError::type_(format!("`+` can not apply to {}", x)));
+                return Err(RError::type_(format!(
+                    "`+` can not apply to different types such as number and {}.",
+                    x.type_str()
+                )));
             }
         }
         Ok(result.into())
     }
+    x => Err(RError::type_(format!(
+        "`+` can not apply to {}.",
+        x.type_str()
+    ))),
 });
 
 pub const SUB: CalculateOperator = CalculateOperator("-", 1, |xs| {
     if xs.len() == 1 {
-        if let RValue::Atom(RAtom::Number(x)) = xs[0] {
-            Ok((-x).into())
-        } else {
-            Err(RError::type_(format!("`-` can not apply to {}", xs[0])))
+        match &xs[0] {
+            RValue::Atom(RAtom::Number(x)) => Ok((-x).into()),
+            x => Err(RError::type_(format!(
+                "`-` can not apply to {}.",
+                x.type_str()
+            ))),
         }
     } else {
         let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
             x
         } else {
-            return Err(RError::type_(format!("`-` can not apply to {}", xs[0])));
+            return Err(RError::type_(format!(
+                "`-` can not apply to {}.",
+                xs[0].type_str()
+            )));
         };
 
         for x in &xs[1..] {
             if let RValue::Atom(RAtom::Number(x)) = x {
                 result -= *x;
             } else {
-                return Err(RError::type_(format!("`-` can not apply to {}", x)));
+                return Err(RError::type_(format!(
+                    "`-` can not apply to {}.",
+                    x.type_str()
+                )));
             }
         }
 
@@ -81,7 +100,10 @@ pub const MULTIPLY: CalculateOperator = CalculateOperator("*", 2, |xs| {
         if let RValue::Atom(RAtom::Number(x)) = x {
             result *= x;
         } else {
-            return Err(RError::type_(format!("`*` can not apply to {}", x)));
+            return Err(RError::type_(format!(
+                "`*` can not apply to {}.",
+                x.type_str()
+            )));
         }
     }
     Ok(result.into())
@@ -91,14 +113,20 @@ pub const DIVIDE: CalculateOperator = CalculateOperator("/", 2, |xs| {
     let mut result = if let RValue::Atom(RAtom::Number(x)) = xs[0] {
         x
     } else {
-        return Err(RError::type_(format!("`/` can not apply to {}", xs[0])));
+        return Err(RError::type_(format!(
+            "`/` can not apply to {}.",
+            xs[0].type_str()
+        )));
     };
 
     for x in &xs[1..] {
         if let RValue::Atom(RAtom::Number(x)) = x {
             result /= *x;
         } else {
-            return Err(RError::type_(format!("`/` can not apply to {}", x)));
+            return Err(RError::type_(format!(
+                "`/` can not apply to {}.",
+                x.type_str()
+            )));
         }
     }
 

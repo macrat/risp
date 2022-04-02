@@ -34,12 +34,17 @@
         (func ()
               (try-catch
                 (func (err trace)
-                      (assert = err (list "incompatible type" "`+` can not apply to 123")))
+                      (assert = err (list "incompatible type" "`+` can not apply to func.")))
+                (+ + -))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`+` can not apply to different types such as string and number.")))
                 (+ "hello" 123))
 
               (try-catch
                 (func (err trace)
-                      (assert = err (list "incompatible type" "`+` can not apply to \"hello\"")))
+                      (assert = err (list "incompatible type" "`+` can not apply to different types such as number and string.")))
                 (+ 123 "hello"))))))
 
 ((test case)
@@ -59,7 +64,20 @@
               (assert = -1 (- 1))
               (assert = -1 (- 1 2))
               (assert = -13 (- 1 2 3 4 5))
-              (assert = -7 (- 1 (- 2 3) 4 5))))))
+              (assert = -7 (- 1 (- 2 3) 4 5))))
+
+       ((test case)
+        "mismatch type"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`-` can not apply to func.")))
+                (- + -))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`-` can not apply to string.")))
+                (- 123 "hello"))))))
 
 ((test case)
  "*"
@@ -82,7 +100,20 @@
         (func ()
               (assert = 2 (* 1 2))
               (assert = 120 (* 1 2 3 4 5))
-              (assert = -5 (* -1 5))))))
+              (assert = -5 (* -1 5))))
+
+       ((test case)
+        "mismatch type"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`*` can not apply to func.")))
+                (* + -))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`*` can not apply to string.")))
+                (* 123 "hello"))))))
 
 ((test case)
  "/"
@@ -104,4 +135,17 @@
         "number"
         (func ()
               (assert = 2.5 (/ 5 2))
-              (assert = 5 (/ 20 2 2))))))
+              (assert = 5 (/ 20 2 2))))
+
+       ((test case)
+        "mismatch type"
+        (func ()
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`/` can not apply to func.")))
+                (/ + -))
+
+              (try-catch
+                (func (err trace)
+                      (assert = err (list "incompatible type" "`/` can not apply to string.")))
+                (/ 123 "hello"))))))
