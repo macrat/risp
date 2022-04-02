@@ -32,8 +32,8 @@
  "higher order operation"
  (func ()
        (def f (func (x)
-                    (map (seq (- x 1))
-                         (func (n) (set x (* x n))))
+                    (map (func (n) (set x (* x n)))
+                         (seq (- x 1)))
                     x))
 
        (assert = 120 (f 5))))

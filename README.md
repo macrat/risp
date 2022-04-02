@@ -86,8 +86,8 @@ $ cargo run
 - `(car list-or-string)`: take first item of the list, or take first character of the string.
 - `(cdr list-or-string)`: take second and later items of the list, or take second and later characters of the string.
 - `(seq to)` or `(seq from to)`: make list of numbers. for example, `(seq 5)` makes `(list 1 2 3 4 5)`.
-- `(map list function)`: apply each values in the list to the function, and returns the results as a list. the function's signature is `(func (current-value))`.
-- `(fold list function)`: apply each values in the list to the function, and accumulate result. the function's signature is `(func (accumulated-value current-value))`.
+- `(map function list)`: apply each values in the list to the function, and returns the results as a list. the function's signature is `(func (current-value))`.
+- `(fold function list)`: apply each values in the list to the function, and accumulate result. the function's signature is `(func (accumulated-value current-value))`.
 
 ### type
 - `(number value)`: convert value to a number.

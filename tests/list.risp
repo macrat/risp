@@ -6,19 +6,25 @@
 ((test case)
  "map"
  (func ()
-  (assert = (list 2 4 6) (map (list 1 2 3) (func (x) (* x 2))))
+       (def f (func (x) (* x 2)))
+       (def xs (map f (seq 5)))
+       (assert = (list 2 4 6 8 10) xs)
 
-  (assert =
-          (list "a" "b")
-          (map (list (list "a" 1) (list "b" 2))
-               car))))
+       (assert = (list 0 1 0) (map not (seq -1 1)))
+
+       (assert =
+               (list "a" "b")
+               (map car (list (list "a" 1) (list "b" 2))))))
 
 ((test case)
  "fold"
  (func ()
-  (assert = 15 (fold (list 1 2 3 4 5) +))
+       (assert = 15 (fold + (seq 5)))
+       (assert = 120 (fold * (seq 5)))
 
-  (assert =
-          "ab"
-          (fold (list "" (list "a" 1) (list "b" 2))
-                (func (acc cur) (+ acc (car cur)))))))
+       (assert = "hello" (fold + (list "he" "l" "lo")))
+
+       (assert =
+               "ab"
+               (fold (func (acc cur) (+ acc (car cur)))
+                     (list "" (list "a" 1) (list "b" 2))))))

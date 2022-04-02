@@ -144,27 +144,27 @@ impl Callable for Map {
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        let list = match args[0].compute(env, scope)? {
-            RValue::List(xs) => xs,
-            x => {
-                return Err(RError::type_(format!(
-                    "the first argument of `map` must be a list, but got `{}`.",
-                    x
-                )))
-            }
-        };
-
-        let func = match args[1].compute(env, scope)? {
+        let func = match args[0].compute(env, scope)? {
             RValue::Func(f) => f,
             x => {
                 return Err(RError::type_(format!(
-                    "the second argument of `map` must be a function, but got `{}`.",
+                    "the first argument of `map` must be a function, but got `{}`.",
                     x
                 )))
             }
         };
 
         func.arg_rule().check(&"map function".to_string(), 1)?;
+
+        let list = match args[1].compute(env, scope)? {
+            RValue::List(xs) => xs,
+            x => {
+                return Err(RError::type_(format!(
+                    "the second argument of `map` must be a list, but got `{}`.",
+                    x
+                )))
+            }
+        };
 
         let mut result = RList::empty(None);
 
@@ -189,33 +189,33 @@ impl Callable for Fold {
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        let list = match args[0].compute(env, scope)? {
-            RValue::List(xs) if xs.len() >= 2 => xs,
-            RValue::List(xs) => {
-                return Err(RError::type_(format!(
-                    "the first argument of `fold` must be longer than 2, but got `{}`.",
-                    xs
-                )))
-            }
-            x => {
-                return Err(RError::type_(format!(
-                    "the first argument of `fold` must be a list, but got `{}`.",
-                    x
-                )))
-            }
-        };
-
-        let func = match args[1].compute(env, scope)? {
+        let func = match args[0].compute(env, scope)? {
             RValue::Func(f) => f,
             x => {
                 return Err(RError::type_(format!(
-                    "the second argument of `fold` must be a function, but got `{}`.",
+                    "the first argument of `fold` must be a function, but got `{}`.",
                     x
                 )))
             }
         };
 
         func.arg_rule().check(&"fold function".to_string(), 2)?;
+
+        let list = match args[1].compute(env, scope)? {
+            RValue::List(xs) if xs.len() >= 2 => xs,
+            RValue::List(xs) => {
+                return Err(RError::type_(format!(
+                    "the second argument of `fold` must be longer than 2, but got `{}`.",
+                    xs
+                )))
+            }
+            x => {
+                return Err(RError::type_(format!(
+                    "the second argument of `fold` must be a list, but got `{}`.",
+                    x
+                )))
+            }
+        };
 
         let mut result = list[0].clone();
 

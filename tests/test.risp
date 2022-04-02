@@ -6,8 +6,10 @@
 
 (def print-traceback
      (func (err trace)
-           (while (cdr (cdr trace))
-                  (println " " (fold (car trace) (func (acc cur) (+ acc ": " (string cur)))))
+           (while (if (= (car err) "assertion unsatisfied")
+                    (cdr (cdr trace))
+                    trace)
+                  (println " " (fold (func (acc cur) (+ acc ": " (string cur))) (car trace)))
                   (set trace (cdr trace)))
            (println)
            (println err)))
