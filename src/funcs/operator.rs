@@ -184,6 +184,54 @@ pub const LE: CompareOperator = CompareOperator("<=", |x, y| Ok(x.cmp(y)? != Ord
 pub const GE: CompareOperator = CompareOperator(">=", |x, y| Ok(x.cmp(y)? != Ordering::Less));
 
 #[derive(Debug)]
+pub struct And;
+
+impl Callable for And {
+    fn name(&self) -> &str {
+        "and"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(1)
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        Ok(
+            (if args.compute_each(env, scope)?.iter().all(|x| x.as_bool()) {
+                1.0
+            } else {
+                0.0
+            })
+            .into(),
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct Or;
+
+impl Callable for Or {
+    fn name(&self) -> &str {
+        "or"
+    }
+
+    fn arg_rule(&self) -> ArgumentRule {
+        ArgumentRule::AtLeast(1)
+    }
+
+    fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
+        Ok(
+            (if args.compute_each(env, scope)?.iter().any(|x| x.as_bool()) {
+                1.0
+            } else {
+                0.0
+            })
+            .into(),
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct Not;
 
 impl Callable for Not {

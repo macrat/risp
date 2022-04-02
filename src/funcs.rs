@@ -93,6 +93,8 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "<=", binary_func!(operator::LE));
     register!(scope, ">=", binary_func!(operator::GE));
 
+    register!(scope, "and", binary_func!(operator::And));
+    register!(scope, "or", binary_func!(operator::Or));
     register!(scope, "not", binary_func!(operator::Not));
 
     Ok(())

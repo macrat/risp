@@ -115,5 +115,7 @@ $ cargo run
 - `(/ numbers...)`: divide numbers.
 - `(= values...)`: returns `1` if the all values are the same, otherwise returns `0`.
 - `(!= values...)`: returns `1` if the all values are not the same, otherwise returns `0`.
+- `(and values...)`: returns `1` if the all values are true, otherwise returns `0`.
+- `(or values...)`: returns `1` if any value in the values is true, otherwise returns `0`.
 - `(not value)`: returns `1` if the value is true, otherwise returns `0`.
 - `(< values...)`, `(<= values...)`, `(> values...)`, `(>= values...)`: compare values.

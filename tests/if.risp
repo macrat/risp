@@ -43,12 +43,27 @@
     (set result 2))
   (assert = 1 result))
 
-(do
-  (def result 0)
-  (if (not (= 1 1))
-    (set result 1)
-    (set result 2))
-  (assert = 2 result))
+((test case)
+ "not"
+ (func ()
+       (assert = 1 (not 0))
+       (assert = 0 (not 1))))
+
+((test case)
+ "and"
+ (func ()
+       (assert = 0 (and 0 0 0))
+       (assert = 0 (and 1 0 0))
+       (assert = 0 (and 0 1 1))
+       (assert = 1 (and 1 1 1))))
+
+((test case)
+ "or"
+ (func ()
+       (assert = 0 (or 0 0 0))
+       (assert = 1 (or 1 0 0))
+       (assert = 1 (or 0 1 1))
+       (assert = 1 (or 1 1 1))))
 
 ((test case)
  "number of arguments"
