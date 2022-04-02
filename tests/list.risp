@@ -140,26 +140,6 @@
                  (tail 10 "あいうえお"))))))
 
 ((test case)
- "car cdr"
-
- (func ()
-       ((test case)
-        "list"
-        (func ()
-              (def xs (list 12 34 56))
-              (assert = 12 (car xs))
-              (assert = (list 34 56) (cdr xs))
-              (assert = 34 (car (cdr xs)))))
-
-       ((test case)
-        "string"
-        (func ()
-              (def xs "hello")
-              (assert = "h" (car xs))
-              (assert = "e" (car (cdr xs)))
-              (assert = "llo" (cdr (cdr xs)))))))
-
-((test case)
  "map"
  (func ()
        (def f (func (x) (* x 2)))
@@ -169,6 +149,8 @@
        (assert = (list 0 1 0) (map not (seq -1 1)))
 
        (assert = (list "a") (map + (list "a")))
+
+       (def car (func (xs) (get 0 xs)))
 
        (assert =
                (list "a" "b")
@@ -184,6 +166,8 @@
 
        (assert = "a" (fold + (list "a")))
        (assert = () (fold + ()))
+
+       (def car (func (xs) (get 0 xs)))
 
        (assert =
                "ab"

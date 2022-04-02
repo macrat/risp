@@ -58,7 +58,7 @@
  "variable arguments"
  (func ()
        (def f (func args
-                    (assert = (car args) (cdr args))))
+                    (assert = (get 0 args) (tail -1 args))))
 
        (f ())
        (f (list 1) 1)
