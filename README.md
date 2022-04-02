@@ -90,8 +90,8 @@ $ cargo run
 - `(head number list-or-string)`: take `number` items from the list, or take characters from the string. the negative number means index from the last.
 - `(tail number list-or-string)`: take `number` items from the list, or take characters from the string. the negative number means index from the first.
 - `(seq to)` or `(seq from to)`: make list of numbers. for example, `(seq 5)` makes `(list 1 2 3 4 5)`.
-- `(map function list)`: apply each values in the list to the function, and returns the results as a list. the function's signature is `(func (current-value))`.
-- `(fold function list)`: apply each values in the list to the function, and accumulate result. the function's signature is `(func (accumulated-value current-value))`.
+- `(map function list-or-string)`: apply each values in the list or the string to the function, and returns the results as a list. the function's signature is `(func (current-value))`.
+- `(fold function list-or-string)`: apply each values in the list or the string to the function, and accumulate result. the function's signature is `(func (accumulated-value current-value))`.
 
 ### type
 - `(number value)`: convert value to a number.

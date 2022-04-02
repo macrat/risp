@@ -283,23 +283,34 @@ impl Callable for Map {
 
         func.arg_rule().check(&"map function".to_string(), 1)?;
 
-        let list = match args[1].compute(env, scope)? {
-            RValue::List(xs) => xs,
-            x => {
-                return Err(RError::type_(format!(
-                    "the second argument of `map` must be a list, but got `{}`.",
-                    x
-                )))
+        match args[1].compute(env, scope)? {
+            RValue::List(list) => {
+                let mut result = RList::empty(None);
+
+                for x in list.iter() {
+                    result.push(func.call(env, scope, RList::new(vec![x.clone()], None))?);
+                }
+
+                Ok(RValue::List(result))
             }
-        };
+            RValue::Atom(RAtom::String(s)) => {
+                let mut result = RList::empty(None);
 
-        let mut result = RList::empty(None);
+                for c in s.chars() {
+                    result.push(func.call(
+                        env,
+                        scope,
+                        RList::new(vec![c.to_string().into()], None),
+                    )?);
+                }
 
-        for x in list.iter() {
-            result.push(func.call(env, scope, RList::new(vec![x.clone()], None))?);
+                Ok(RValue::List(result))
+            }
+            x => Err(RError::type_(format!(
+                "the second argument of `map` must be a list or a string, but got `{}`.",
+                x
+            ))),
         }
-
-        Ok(RValue::List(result))
     }
 }
 
@@ -328,28 +339,41 @@ impl Callable for Fold {
 
         func.arg_rule().check(&"fold function".to_string(), 2)?;
 
-        let list = match args[1].compute(env, scope)? {
-            RValue::List(xs) if xs.len() >= 2 => xs,
-            RValue::List(xs) if xs.len() == 1 => {
-                return Ok(xs[0].clone());
-            }
-            RValue::List(xs) => {
-                return Ok(RValue::List(xs.clone()));
-            }
-            x => {
-                return Err(RError::type_(format!(
-                    "the second argument of `fold` must be a list, but got `{}`.",
-                    x
-                )));
-            }
-        };
+        match args[1].compute(env, scope)? {
+            RValue::List(list) if list.len() >= 2 => {
+                let mut result = list[0].clone();
 
-        let mut result = list[0].clone();
+                for x in &list[1..] {
+                    result = func.call(env, scope, RList::new(vec![result, x.clone()], None))?;
+                }
 
-        for x in &list[1..] {
-            result = func.call(env, scope, RList::new(vec![result, x.clone()], None))?;
+                Ok(result)
+            }
+            RValue::List(xs) if xs.len() == 1 => Ok(xs[0].clone()),
+            RValue::List(xs) => Ok(RValue::List(xs.clone())),
+            RValue::Atom(RAtom::String(s)) if s.len() <= 1 => Ok(s.into()),
+            RValue::Atom(RAtom::String(s)) => {
+                let mut chars = s.chars();
+                let mut result: RValue = if let Some(c) = chars.next() {
+                    c.to_string().into()
+                } else {
+                    return Ok("".into());
+                };
+
+                for c in chars {
+                    result = func.call(
+                        env,
+                        scope,
+                        RList::new(vec![result, c.to_string().into()], None),
+                    )?;
+                }
+
+                Ok(result)
+            }
+            x => Err(RError::type_(format!(
+                "the second argument of `fold` must be a list or a string, but got `{}`.",
+                x,
+            ))),
         }
-
-        Ok(result)
     }
 }
