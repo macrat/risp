@@ -53,3 +53,13 @@
                  (counter)))
 
        (assert = xs (list 1 2 3))))
+
+((test case)
+ "variable arguments"
+ (func ()
+       (def f (func args
+                    (assert = (car args) (cdr args))))
+
+       (f ())
+       (f (list 1) 1)
+       (f (list "hello" 123) "hello" 123)))

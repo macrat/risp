@@ -20,6 +20,7 @@ impl Callable for Func {
     fn call(&self, _: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         Ok(RValue::Func(Rc::new(RFunc::Pure {
             args: match &args[0] {
+                RValue::Atom(RAtom::Symbol(name)) => ArgumentDefinition::Variable(name.clone()),
                 RValue::List(list) => {
                     let mut symbols: Vec<String> = Vec::new();
                     for x in list.iter() {
@@ -31,11 +32,12 @@ impl Callable for Func {
                             ));
                         }
                     }
-                    symbols
+                    ArgumentDefinition::Certain(symbols)
                 }
                 _ => {
                     return Err(RError::type_(
-                        "first argument of `func` should be a list of symbol.".into(),
+                        "first argument of `func` should be a single symbol or a list of symbol."
+                            .into(),
                     ))
                 }
             },

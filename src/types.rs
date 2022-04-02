@@ -383,9 +383,53 @@ impl fmt::Debug for dyn Callable {
 }
 
 #[derive(Debug)]
+pub enum ArgumentDefinition {
+    Certain(Vec<String>),
+    Variable(String),
+}
+
+impl ArgumentDefinition {
+    fn arg_rule(&self) -> ArgumentRule {
+        match self {
+            ArgumentDefinition::Certain(names) => ArgumentRule::Exact(names.len()),
+            ArgumentDefinition::Variable(_) => ArgumentRule::Any,
+        }
+    }
+
+    fn define_into(
+        &self,
+        env: &mut Env,
+        scope: &Scope,
+        args: RList,
+        target: &Scope,
+    ) -> Result<(), RError> {
+        match self {
+            ArgumentDefinition::Certain(names) => {
+                for (name, value) in names.iter().zip(args.iter()) {
+                    target.define(name.clone(), value.compute(env, scope)?)?;
+                }
+            }
+            ArgumentDefinition::Variable(name) => {
+                target.define(name.clone(), RValue::List(args.compute_each(env, scope)?))?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for ArgumentDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ArgumentDefinition::Certain(names) => write!(f, "({})", names.join(" ")),
+            ArgumentDefinition::Variable(name) => write!(f, "{}", name),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum RFunc {
     Pure {
-        args: Vec<String>,
+        args: ArgumentDefinition,
         body: RList,
         capture: Scope,
     },
@@ -408,7 +452,7 @@ impl Callable for RFunc {
 
     fn arg_rule(&self) -> ArgumentRule {
         match self {
-            RFunc::Pure { args, .. } => ArgumentRule::Exact(args.len()),
+            RFunc::Pure { args, .. } => args.arg_rule(),
             RFunc::Binary(func) => func.arg_rule(),
         }
     }
@@ -416,14 +460,12 @@ impl Callable for RFunc {
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
         match self {
             RFunc::Pure {
-                args: arg_names,
+                args: args_def,
                 body,
                 capture,
             } => {
                 let local = capture.child();
-                for (name, value) in arg_names.iter().zip(args.iter()) {
-                    local.define(name.into(), value.compute(env, scope)?)?;
-                }
+                args_def.define_into(env, scope, args, &local)?;
 
                 body.compute_last(env, &local)
             }
@@ -437,9 +479,9 @@ impl fmt::Display for RFunc {
         match self {
             RFunc::Pure { args, body, .. } => {
                 if body.len() > 0 {
-                    write!(f, "(func ({}) {})", args.join(" "), body.to_bare_string())
+                    write!(f, "(func {} {})", args, body.to_bare_string())
                 } else {
-                    write!(f, "(func ({}))", args.join(" "))
+                    write!(f, "(func {})", args)
                 }
             }
             RFunc::Binary(c) => write!(f, "{}", *c),

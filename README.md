@@ -79,7 +79,8 @@ $ cargo run
 - `(try-catch func expressions...)`: compute `expressions`, and call `func` if an error has throwed.
 
 ### function
-- `(func (args...) body...)`: make new function.
+- `(func (args...) body...)`: make a new function that takes certain length of arguments.
+- `(func arg body...)`: make a new function that takes variable length of arguments.
 
 ### list
 - `(list values...)`: make list that have `values`. this is the same as `'(values...)` in major Lisp implementations.
