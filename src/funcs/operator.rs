@@ -196,14 +196,12 @@ impl Callable for And {
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        Ok(
-            (if args.compute_each(env, scope)?.iter().all(|x| x.as_bool()) {
-                1.0
-            } else {
-                0.0
-            })
-            .into(),
-        )
+        for x in args.iter() {
+            if !x.compute(env, scope)?.as_bool() {
+                return Ok(0.0.into());
+            }
+        }
+        return Ok(1.0.into());
     }
 }
 
@@ -220,14 +218,12 @@ impl Callable for Or {
     }
 
     fn call(&self, env: &mut Env, scope: &Scope, args: RList) -> Result<RValue, RError> {
-        Ok(
-            (if args.compute_each(env, scope)?.iter().any(|x| x.as_bool()) {
-                1.0
-            } else {
-                0.0
-            })
-            .into(),
-        )
+        for x in args.iter() {
+            if x.compute(env, scope)?.as_bool() {
+                return Ok(1.0.into());
+            }
+        }
+        return Ok(0.0.into());
     }
 }
 
