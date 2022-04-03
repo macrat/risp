@@ -61,10 +61,7 @@ pub fn register_to(scope: &Scope) -> Result<(), RError> {
     register!(scope, "import", binary_func!(io::Import));
     register!(scope, "stdout", binary_func!(io::stdout()));
     register!(scope, "stderr", binary_func!(io::stderr()));
-    execute(
-        scope,
-        r#"(def print (func xs (if (!= xs ()) (stdout (fold (func (acc cur) (+ (string acc) " " (string cur))) xs)))))"#,
-    )?;
+    execute(scope, r"(def print (func xs (stdout (apply string xs))))")?;
     execute(
         scope,
         r#"(def println (func xs (apply print xs) (stdout "\n")))"#,
