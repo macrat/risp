@@ -1,4 +1,4 @@
-" vim: set ft=lisp : "
+# vim: ft=lisp
 
 (def assert ((import "./test") assert))
 
@@ -9,6 +9,7 @@
                           (tarai (- y 1) z x)
                           (tarai (- z 1) x y)))))
 
-"(assert = 9 (tarai 9 5 0))"
+# this is too slow to test
+# (assert = 9 (tarai 9 5 0))
 
 (assert = 5 (tarai 5 3 0))

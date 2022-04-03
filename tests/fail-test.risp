@@ -1,5 +1,5 @@
-" This test should be failed"
-" vim: set ft=lisp : "
+# This test should be failed
+# vim: ft=lisp
 
 (def assert ((import "./test") assert))
 

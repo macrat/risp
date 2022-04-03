@@ -148,6 +148,7 @@ pub struct Parser {
     builder: AtomBuilder,
     stack: Vec<RList>,
     queue: VecDeque<RValue>,
+    in_comment: bool,
 }
 
 impl Parser {
@@ -161,6 +162,7 @@ impl Parser {
             builder: AtomBuilder::Nil,
             stack: Vec::new(),
             queue: VecDeque::new(),
+            in_comment: false,
         }
     }
 
@@ -168,11 +170,16 @@ impl Parser {
         if c == '\n' {
             self.position.line += 1;
             self.position.col = 0;
+            self.in_comment = false;
         } else {
             self.position.col += 1;
         }
 
         match c {
+            _ if self.in_comment => {}
+            '#' if !self.builder.is_string() => {
+                self.in_comment = true;
+            }
             '(' if !self.builder.is_string() => {
                 self.flush()?;
                 let mut list = RList::empty(Some(self.position.clone()));

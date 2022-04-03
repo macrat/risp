@@ -1,4 +1,4 @@
-" vim: set ft=lisp : "
+# vim: ft=lisp
 
 (def assert (func (operator wanted actual)
                   (if (not (operator wanted actual))

@@ -1,5 +1,5 @@
-" Reverse Polish Notation "
-" vim: set ft=lisp : "
+# Reverse Polish Notation
+# vim: ft=lisp
 
 (def test (import "./test"))
 (def assert (test assert))
