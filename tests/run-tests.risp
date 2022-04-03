@@ -17,17 +17,17 @@
         ((test case) name
                      (func () (import name))))
   (list 
-    "./calc.risp"
-    "./compare.risp"
-    "./func.risp"
-    "./if.risp"
-    "./list.risp"
-    "./rpn.risp"
-    "./seq.risp"
-    "./tarai.risp"
-    "./type-check.risp"
-    "./type-convert.risp"
-    "./variable-and-scope.risp"))
+    "./calc"
+    "./compare"
+    "./func"
+    "./if"
+    "./list"
+    "./rpn"
+    "./seq"
+    "./tarai"
+    "./type-check"
+    "./type-convert"
+    "./variable-and-scope"))
 
 (println)
 (println "self test:" (test passed) "passed," (test failed) "failed")

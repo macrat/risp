@@ -11,7 +11,7 @@ Just a learning project.
 $ cat hello-world.risp
 (println "hello world!")
 
-$ cargo run <./hello-world.risp
+$ cargo run ./hello-world.risp
 hello world!
 ```
 
@@ -26,7 +26,7 @@ $ cat factorial.risp
 
 (println "5! =" (factorial 5))
 
-$ cargo run <./factorial.risp
+$ cargo run ./factorial.risp
 5! = 120
 ```
 
@@ -37,7 +37,7 @@ $ cat factorial-short.risp
 
 (println "5! =" (factorial 5))
 
-$ cargo run <./factorial-short.risp
+$ cargo run ./factorial-short.risp
 5! = 120
 ```
 
@@ -47,11 +47,11 @@ $ cat lib.risp
   (println "hello" (+ target "!"))))
 
 $ cat main.risp
-(def lib (import "./lib.risp"))
+(def lib (import "./lib"))
 
 ((lib greeting) "world")
 
-$ cargo run <./main.risp
+$ cargo run ./main.risp
 hello world!
 ```
 
