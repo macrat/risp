@@ -1,7 +1,7 @@
 " Reverse Polish Notation "
 " vim: set ft=lisp : "
 
-(def test (import "./test.risp"))
+(def test (import "./test"))
 (def assert (test assert))
 
 (def verbose 0)

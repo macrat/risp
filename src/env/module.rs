@@ -61,7 +61,11 @@ impl Module {
             Some(p) => p.file,
             None => ".".to_string(),
         };
-        let raw_path = Path::new(cwd.as_str()).with_file_name(self.path.clone());
+        let raw_path = Path::new(cwd.as_str()).with_file_name(if self.path.ends_with(".risp") {
+            self.path.clone()
+        } else {
+            self.path.clone() + ".risp"
+        });
         let path = match raw_path.canonicalize() {
             Ok(p) => match p.to_str() {
                 Some(p) => p.to_string(),

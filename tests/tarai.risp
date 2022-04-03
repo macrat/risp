@@ -1,6 +1,6 @@
 " vim: set ft=lisp : "
 
-(def assert ((import "./test.risp") assert))
+(def assert ((import "./test") assert))
 
 (def tarai (func (x y z)
                  (if (<= x y)
